@@ -72,6 +72,10 @@ dylib-forge ./AbstractMaps.framework/AbstractMaps \
 
 This path is more explicit and easier to audit, but different vendors build their libraries in different ways. You may still need to leave a specific symbol undefined with `-Wl,-U,_some_undefined_symbol`, add framework search paths with `-F`, ignore a bad autolink entry with `--ignore-autolink`, or exclude an object that does not belong in the final binary with `--exclude-object`.
 
+## Tips
+
+- Set a minimum OS version with `--linker-arg -m<os>-version-min=<version>`, for example `--linker-arg -mios-simulator-version-min=18.0`.
+
 ## Inspiration
 
 The idea for this project came from these materials:

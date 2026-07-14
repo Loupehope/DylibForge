@@ -15,6 +15,7 @@ struct AutolinkDirectives {
     let frameworks: Set<String>
     let weakFrameworks: Set<String>
     let libraries: Set<String>
+    let weakLibraries: Set<String>
 }
 
 /// Architecture information for the input binary.
@@ -32,7 +33,7 @@ struct ExtractedObjects {
 struct DynamicSliceLinkContext {
     let sdk: String
     let sdkPath: String
-    let swiftTargetTriple: String?
+    let targetTriples: SDKTargetTriples
     let frameworkSearchRoots: [URL]
     let architecture: String
     let objectFiles: [URL]
@@ -92,6 +93,12 @@ struct SDKSupportedTarget: Decodable {
         llvmTargetTripleEnvironment = rawEnvironment?.isEmpty == true ? nil : rawEnvironment
         defaultDeploymentTarget = try container.decode(String.self, forKey: .defaultDeploymentTarget)
     }
+}
+
+/// Target spellings derived from one SDK target definition.
+struct SDKTargetTriples {
+    let swift: String
+    let tbd: String
 }
 
 /// Linking options received from the CLI.

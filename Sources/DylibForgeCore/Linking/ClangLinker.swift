@@ -3,7 +3,6 @@ import Logging
 
 /// Drives architecture discovery, autolink extraction, and the final `clang -dynamiclib` invocation.
 final class ClangLinker {
-    private let logger = Logger(label: "dylib-forge.link")
     private let environment: ToolEnvironment
     private let machoEditor: MachOEditor
     private let directiveParser: AutolinkDirectiveParser
@@ -64,6 +63,7 @@ final class ClangLinker {
             frameworks: auto.frameworks.subtracting(ignoredSet),
             weakFrameworks: auto.weakFrameworks.subtracting(ignoredSet),
             libraries: auto.libraries.subtracting(ignoredSet),
+            weakLibraries: auto.weakLibraries.subtracting(ignoredSet),
         )
     }
 
@@ -78,10 +78,12 @@ final class ClangLinker {
         linkerArgs: [String],
     ) async throws -> DynamicSliceLinkContext {
         let sdkPath = try await resolveSDKPath(for: sdk)
-        return try DynamicSliceLinkContext(
+        let targetTriples = try resolveTargetTriples(sdk: sdk, sdkPath: sdkPath, architecture: architecture)
+
+        return DynamicSliceLinkContext(
             sdk: sdk,
             sdkPath: sdkPath,
-            swiftTargetTriple: resolveSwiftTargetTriple(sdk: sdk, sdkPath: sdkPath, architecture: architecture),
+            targetTriples: targetTriples,
             frameworkSearchRoots: frameworkSearchRoots(sdkPath: sdkPath, frameworkPaths: autolinkDirectives.frameworkPaths),
             architecture: architecture,
             objectFiles: objectFiles,
@@ -129,6 +131,7 @@ final class ClangLinker {
 
         // Auto-linked libraries and explicit user-supplied linker arguments.
         context.autolinkDirectives.libraries.forEach { arguments.append("-l\($0)") }
+        context.autolinkDirectives.weakLibraries.forEach { arguments.append("-weak-l\($0)") }
         arguments.append(contentsOf: context.linkerArgs)
 
         // Native object inputs and final output path.
@@ -154,11 +157,8 @@ final class ClangLinker {
 private extension ClangLinker {
     /// Returns Swift runtime library search paths for archives that carry Swift autolink libraries.
     func swiftRuntimeLibraryPaths(context: DynamicSliceLinkContext) async throws -> [String] {
-        guard context.autolinkDirectives.libraries.contains(where: { $0.hasPrefix("swift") }) else {
-            return []
-        }
-
-        guard let target = context.swiftTargetTriple else {
+        let linkedLibraries = context.autolinkDirectives.libraries.union(context.autolinkDirectives.weakLibraries)
+        guard linkedLibraries.contains(where: { $0.hasPrefix("swift") }) else {
             return []
         }
 
@@ -166,7 +166,7 @@ private extension ClangLinker {
             "xcrun",
             "--sdk", context.sdk,
             "swiftc",
-            "-target", target,
+            "-target", context.targetTriples.swift,
             "-print-target-info",
         )
         let targetInfo = try JSONDecoder().decode(SwiftTargetInfo.self, from: Data(result.stdout.utf8))
@@ -186,19 +186,25 @@ private extension ClangLinker {
         return path
     }
 
-    /// Builds the Swift target triple from the selected SDK's own metadata.
-    func resolveSwiftTargetTriple(sdk: String, sdkPath: String, architecture: String) throws -> String? {
+    /// Builds Swift and TAPI target triples from the selected SDK's own metadata.
+    func resolveTargetTriples(sdk: String, sdkPath: String, architecture: String) throws -> SDKTargetTriples {
         let settingsURL = URL(fileURLWithPath: sdkPath, isDirectory: true).appendingPathComponent("SDKSettings.plist")
         let settingsData = try Data(contentsOf: settingsURL)
         let settings = try PropertyListDecoder().decode(SDKSettings.self, from: settingsData)
 
-        guard let target = settings.supportedTargets[sdk] else {
-            return nil
+        guard let target = settings.supportedTargets[sdk]
+            ?? settings.supportedTargets.first(where: { sdk.hasPrefix($0.key) })?.value
+        else {
+            throw DylibForgeError.message("SDK '\(sdk)' has no supported target definition: \(sdkPath)")
         }
 
         let environmentSuffix = target.llvmTargetTripleEnvironment.map { "-\($0)" } ?? ""
         let sysWithVersion = "\(target.llvmTargetTripleSys)\(target.defaultDeploymentTarget)"
-        return "\(architecture)-\(target.llvmTargetTripleVendor)-\(sysWithVersion)\(environmentSuffix)"
+        let swiftTargetTriple = "\(architecture)-\(target.llvmTargetTripleVendor)-\(sysWithVersion)\(environmentSuffix)"
+        let tbdSystem = target.llvmTargetTripleSys == "macosx" ? "macos" : target.llvmTargetTripleSys
+        let tbdTargetTriple = "\(architecture)-\(tbdSystem)\(environmentSuffix)"
+
+        return SDKTargetTriples(swift: swiftTargetTriple, tbd: tbdTargetTriple)
     }
 
     /// Returns framework search roots used for inspecting SDK `.tbd` stubs.

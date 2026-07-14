@@ -1,12 +1,16 @@
 import Foundation
+import Logging
+import Yams
 
 /// Filters auto-detected framework dependencies that the selected SDK does not allow direct clients to link.
 final class AutolinkFrameworkFilter {
     private let fileManager: FileManager
+    private let yamlDecoder: YAMLDecoder
 
     /// Creates a filter with an injectable file manager so tests can provide an isolated SDK-like filesystem.
-    init(fileManager: FileManager = .default) {
+    init(fileManager: FileManager = .default, yamlDecoder: YAMLDecoder = YAMLDecoder()) {
         self.fileManager = fileManager
+        self.yamlDecoder = yamlDecoder
     }
 
     /// Returns frameworks that are safe to pass to the linker as auto-detected dependencies.
@@ -24,35 +28,56 @@ final class AutolinkFrameworkFilter {
 private extension AutolinkFrameworkFilter {
     /// Checks a single framework against its `.tbd` client allowlist, if the SDK provides one.
     func isFrameworkAllowed(_ framework: String, context: DynamicSliceLinkContext) -> Bool {
-        guard let allowedClients = allowedClients(
+        switch frameworkLinkability(
             forFramework: framework,
             context: context,
-        ) else {
-            return true
-        }
+        ) {
+        case .missing:
+            // Preserve a genuinely missing dependency so the linker can report it to the user.
+            true
 
-        return allowedClients.contains(context.linkedProductName)
+        case .headerOnly:
+            // SDK modules such as CoreAudioTypes expose headers but have no dylib or `.tbd` to link.
+            false
+
+        case .linkable(allowedClients: nil):
+            true
+
+        case let .linkable(allowedClients: allowedClients?):
+            allowedClients.contains(context.linkedProductName)
+        }
     }
 
-    /// Reads the first matching framework stub and extracts its `allowable-clients` entries.
+    /// Locates a framework's linkable payload and, when present, its `.tbd` client allowlist.
     ///
-    /// A `nil` return means "no restriction known": either the stub was not found/readable, or the stub does
-    /// not declare `allowable-clients`. The caller intentionally treats that as allowed, matching normal linker
-    /// behavior for public frameworks.
-    func allowedClients(forFramework framework: String, context: DynamicSliceLinkContext) -> Set<String>? {
+    /// A framework directory without either a binary or `.tbd` is a header-only module rather than a valid linker
+    /// input. A completely missing framework remains distinguishable so the linker can report that dependency.
+    func frameworkLinkability(forFramework framework: String, context: DynamicSliceLinkContext) -> FrameworkLinkability {
+        var foundFrameworkDirectory = false
+
         // Search explicit `-F` paths before SDK defaults, matching how linker framework lookup is normally ordered.
         for frameworkStubURL in frameworkStubURLs(forFramework: framework, context: context) {
-            guard
-                fileManager.fileExists(atPath: frameworkStubURL.path),
-                let stub = try? String(contentsOf: frameworkStubURL, encoding: .utf8)
-            else {
+            let frameworkURL = frameworkStubURL.deletingLastPathComponent()
+            guard fileManager.fileExists(atPath: frameworkURL.path) else {
+                continue
+            }
+            foundFrameworkDirectory = true
+
+            let frameworkBinaryURL = frameworkStubURL.deletingPathExtension()
+            guard fileManager.fileExists(atPath: frameworkStubURL.path) || fileManager.fileExists(atPath: frameworkBinaryURL.path) else {
                 continue
             }
 
-            return parseAllowedClients(fromTBDStub: stub)
+            guard let stub = try? String(contentsOf: frameworkStubURL, encoding: .utf8) else {
+                return .linkable(allowedClients: nil)
+            }
+
+            return .linkable(
+                allowedClients: parseAllowedClients(fromTBDStub: stub, target: context.targetTriples.tbd),
+            )
         }
 
-        return nil
+        return foundFrameworkDirectory ? .headerOnly : .missing
     }
 
     /// Builds candidate `.tbd` locations for a framework name.
@@ -66,62 +91,56 @@ private extension AutolinkFrameworkFilter {
             [
                 rootURL.appendingPathComponent(frameworkRelativePath),
                 rootURL.appendingPathComponent("System/Library/Frameworks/\(frameworkRelativePath)"),
+                rootURL.appendingPathComponent("System/Library/SubFrameworks/\(frameworkRelativePath)"),
                 rootURL.appendingPathComponent("System/Library/PrivateFrameworks/\(frameworkRelativePath)"),
             ]
         }
     }
 
-    /// Extracts all client names from a TAPI `.tbd` `allowable-clients` block.
-    ///
-    /// The project only needs a tiny slice of the YAML-ish `.tbd` format. This deliberately avoids introducing
-    /// a YAML dependency: it locates the top-level `allowable-clients:` block and then reads every bracketed
-    /// `clients: [ ... ]` list inside it.
-    func parseAllowedClients(fromTBDStub stub: String) -> Set<String>? {
-        guard let allowableClientsRange = stub.range(of: "allowable-clients:") else {
+    /// Decodes the TAPI YAML document and returns the client list that applies to this architecture/platform.
+    func parseAllowedClients(fromTBDStub stub: String, target: String) -> Set<String>? {
+        guard let metadata = try? yamlDecoder.decode(TBDMetadata.self, from: stub),
+              let allowableClients = metadata.allowableClients
+        else {
             return nil
         }
 
-        // The block continues while subsequent lines are indented. The next non-indented key starts a new block.
-        let remainingStub = stub[allowableClientsRange.upperBound...]
-        let blockLines = remainingStub
-            .split(separator: "\n", omittingEmptySubsequences: false)
-            .prefix { line in
-                line.isEmpty || line.first?.isWhitespace == true
-            }
-        let allowableClientsBlock = blockLines.joined(separator: "\n")
-        var clients = Set<String>()
-
-        for clientList in bracketedValues(named: "clients", in: allowableClientsBlock) {
-            clients.formUnion(clientList)
-        }
-
-        return clients
+        return Set(
+            allowableClients
+                .filter { entry in
+                    entry.targets?.contains(target) ?? true
+                }
+                .flatMap(\.clients)
+                .filter { $0 != "-allowable_client" },
+        )
     }
+}
 
-    /// Parses repeated `key: [ value, ... ]` lists from a text block.
-    ///
-    /// TAPI may wrap long arrays across multiple lines, so the parser searches from `[` to the matching `]`
-    /// instead of assuming the list ends on the same line as the key.
-    func bracketedValues(named key: String, in text: String) -> [[String]] {
-        var values: [[String]] = []
-        var searchStart = text.startIndex
+/// Whether framework lookup found a binary/stub linker input, a header-only module, or nothing at all.
+private enum FrameworkLinkability {
+    /// No framework directory was found; preserve the dependency for the linker to diagnose.
+    case missing
+    /// A framework directory exists but provides neither a binary nor a `.tbd` stub.
+    case headerOnly
+    /// A linkable framework, optionally restricted to the listed direct clients.
+    case linkable(allowedClients: Set<String>?)
+}
 
-        while let keyRange = text.range(of: "\(key):", range: searchStart ..< text.endIndex),
-              let openingBracket = text[keyRange.upperBound...].firstIndex(of: "["),
-              let closingBracket = text[openingBracket...].firstIndex(of: "]")
-        {
-            let rawValues = text[text.index(after: openingBracket) ..< closingBracket]
+/// Partial TAPI `.tbd` document decoded only for its direct-link client restrictions.
+private struct TBDMetadata: Decodable {
+    /// Per-target client allowlists declared by the stub, if it restricts direct linkage.
+    let allowableClients: [TBDAllowableClients]?
 
-            // Values are plain framework/product names in current SDK stubs, sometimes quoted in older formats.
-            let parsedValues = rawValues
-                .split(separator: ",")
-                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "'\""))) }
-                .filter { !$0.isEmpty }
-
-            values.append(parsedValues)
-            searchStart = text.index(after: closingBracket)
-        }
-
-        return values
+    enum CodingKeys: String, CodingKey {
+        case allowableClients = "allowable-clients"
     }
+}
+
+/// One architecture/platform-specific `allowable-clients` entry from a TAPI `.tbd` document.
+private struct TBDAllowableClients: Decodable {
+    /// TAPI target triples to which this allowlist applies; absent means it applies to every target.
+    let targets: [String]?
+
+    /// Product names permitted to link directly against the stub for the matching targets.
+    let clients: [String]
 }

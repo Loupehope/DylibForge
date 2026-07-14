@@ -19,6 +19,7 @@ let package = Package(
         .package(url: "https://github.com/JohnSundell/Files.git", exact: "4.3.0"),
         .package(url: "https://github.com/swiftlang/swift-subprocess.git", exact: "1.0.0-beta.1"),
         .package(url: "https://github.com/nicklockwood/SwiftFormat", exact: "0.62.1"),
+        .package(url: "https://github.com/jpsim/Yams.git", exact: "6.2.2"),
     ],
     targets: [
         .target(
@@ -27,6 +28,7 @@ let package = Package(
                 .product(name: "Files", package: "Files"),
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Subprocess", package: "swift-subprocess"),
+                .product(name: "Yams", package: "Yams"),
             ]
         ),
         .executableTarget(

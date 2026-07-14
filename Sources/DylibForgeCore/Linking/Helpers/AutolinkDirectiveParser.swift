@@ -26,6 +26,7 @@ final class AutolinkDirectiveParser {
             frameworks: collector.frameworks,
             weakFrameworks: collector.weakFrameworks,
             libraries: collector.libraries,
+            weakLibraries: collector.weakLibraries,
         )
     }
 }
@@ -39,6 +40,7 @@ private extension AutolinkDirectiveParser {
             ("-F", \.frameworkPaths),
             ("-L", \.libraryPaths),
             ("-l", \.libraries),
+            ("-weak-l", \.weakLibraries),
         ]
 
         if token == "-Xlinker" {
@@ -57,6 +59,7 @@ private extension AutolinkDirectiveParser {
             ("-F", \.frameworkPaths),
             ("-L", \.libraryPaths),
             ("-l", \.libraries),
+            ("-weak-l", \.weakLibraries),
         ]
 
         for (prefix, keyPath) in gluedOptions where token.hasPrefix(prefix) && token != prefix {
@@ -75,6 +78,7 @@ final class AutolinkDirectiveCollector {
     var frameworks = Set<String>()
     var weakFrameworks = Set<String>()
     var libraries = Set<String>()
+    var weakLibraries = Set<String>()
 
     func insert(_ value: String, into keyPath: ReferenceWritableKeyPath<AutolinkDirectiveCollector, Set<String>>) {
         guard !value.isEmpty else {
