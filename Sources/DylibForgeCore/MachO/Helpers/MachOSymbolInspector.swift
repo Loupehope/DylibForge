@@ -5,7 +5,9 @@ final class MachOSymbolInspector {
     /// Makes private ObjC symbols external so the final dynamic library can expose them.
     func patchObjCSymbolVisibility(in buffer: inout Data) {
         let reader = makeReader(for: buffer)
-        guard reader.isObject, let symbolTable = reader.symbolTable() else {
+        guard reader.isObject,
+              let symbolTable = reader.symbolTable()
+        else {
             return
         }
         let sections = reader.sections()
@@ -23,7 +25,9 @@ final class MachOSymbolInspector {
     /// Returns external native definitions for object-level deduplication of repeated native members.
     func externalNativeDefinitionNames(in data: Data) -> Set<String> {
         let reader = makeReader(for: data)
-        guard reader.isObject, let symbolTable = reader.symbolTable() else {
+        guard reader.isObject,
+              let symbolTable = reader.symbolTable()
+        else {
             return []
         }
         let sections = reader.sections()
@@ -33,7 +37,7 @@ final class MachOSymbolInspector {
             guard let name = externalNativeDefinitionName(
                 reader: reader,
                 symbolOffset: symbolOffset,
-                stringTableOffset: symbolTable.stringTableOffset,
+                symbolTable: symbolTable,
                 sections: sections,
             ) else {
                 continue
@@ -51,7 +55,10 @@ final class MachOSymbolInspector {
         named targetNames: Set<String>,
     ) {
         let reader = makeReader(for: buffer)
-        guard !targetNames.isEmpty, reader.isObject, let symbolTable = reader.symbolTable() else {
+        guard !targetNames.isEmpty,
+              reader.isObject,
+              let symbolTable = reader.symbolTable()
+        else {
             return
         }
         let sections = reader.sections()
@@ -60,13 +67,13 @@ final class MachOSymbolInspector {
             guard let name = externalNativeDefinitionName(
                 reader: reader,
                 symbolOffset: symbolOffset,
-                stringTableOffset: symbolTable.stringTableOffset,
+                symbolTable: symbolTable,
                 sections: sections,
             ), targetNames.contains(name) else {
                 continue
             }
 
-            let typeOffset = symbolOffset + 4
+            let typeOffset = symbolOffset + MachOSymbolLayout.typeOffset
             buffer[typeOffset] = buffer[typeOffset] & ~MachOConstants.nExt & ~MachOConstants.nPext
         }
     }
@@ -85,7 +92,7 @@ private extension MachOSymbolInspector {
         symbolOffset: Int,
         sections: [MachOSection],
     ) {
-        let typeOffset = symbolOffset + 4
+        let typeOffset = symbolOffset + MachOSymbolLayout.typeOffset
         guard typeOffset < buffer.count else {
             return
         }
@@ -107,12 +114,12 @@ private extension MachOSymbolInspector {
     func externalNativeDefinitionName(
         reader: MachOReader,
         symbolOffset: Int,
-        stringTableOffset: Int,
+        symbolTable: MachOSymbolTableInfo,
         sections: [MachOSection],
     ) -> String? {
-        let stringIndex = Int(reader.readUInt32(at: symbolOffset))
-        let typeOffset = symbolOffset + 4
-        let descOffset = symbolOffset + 6
+        let stringIndex = Int(reader.readUInt32(at: symbolOffset + MachOSymbolLayout.stringIndexOffset))
+        let typeOffset = symbolOffset + MachOSymbolLayout.typeOffset
+        let descOffset = symbolOffset + MachOSymbolLayout.descriptionOffset
         guard descOffset + 2 <= reader.data.count else {
             return nil
         }
@@ -120,7 +127,8 @@ private extension MachOSymbolInspector {
         let symbolType = reader.data[typeOffset]
         guard (symbolType & MachOConstants.nStabMask) == 0,
               (symbolType & MachOConstants.nExt) != 0,
-              (symbolType & MachOConstants.nTypeMask) != MachOConstants.nUndef
+              (symbolType & MachOConstants.nTypeMask) == MachOConstants.nSect,
+              section(for: reader, symbolOffset: symbolOffset, sections: sections) != nil
         else {
             return nil
         }
@@ -130,7 +138,11 @@ private extension MachOSymbolInspector {
             return nil
         }
 
-        guard let name = reader.cString(at: stringTableOffset + stringIndex),
+        guard stringIndex < symbolTable.stringTableSize,
+              let name = reader.cString(
+                  at: symbolTable.stringTableOffset + stringIndex,
+                  before: symbolTable.stringTableEnd,
+              ),
               !isObjCMetadataSymbol(reader: reader, symbolOffset: symbolOffset, sections: sections)
         else {
             return nil
@@ -141,16 +153,17 @@ private extension MachOSymbolInspector {
 
     /// Returns `true` when the symbol is defined in an Objective-C metadata section.
     func isObjCMetadataSymbol(reader: MachOReader, symbolOffset: Int, sections: [MachOSection]) -> Bool {
-        let sectionIndexOffset = symbolOffset + 5
+        section(for: reader, symbolOffset: symbolOffset, sections: sections)?.isObjCMetadataSection ?? false
+    }
+
+    /// Finds the section selected by an `N_SECT` entry and rejects invalid section indexes.
+    func section(for reader: MachOReader, symbolOffset: Int, sections: [MachOSection]) -> MachOSection? {
+        let sectionIndexOffset = symbolOffset + MachOSymbolLayout.sectionIndexOffset
         guard sectionIndexOffset < reader.data.count else {
-            return false
+            return nil
         }
 
         let sectionIndex = Int(reader.data[sectionIndexOffset])
-        guard sectionIndex > 0 else {
-            return false
-        }
-
-        return sections.first { $0.index == sectionIndex }?.isObjCMetadataSection ?? false
+        return sections.first { $0.index == sectionIndex }
     }
 }

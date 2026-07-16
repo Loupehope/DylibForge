@@ -53,16 +53,14 @@ final class ClangLinker {
     /// Merges auto-detected dependencies and CLI overrides.
     func mergeAutolinkDirectives(auto: AutolinkDirectives, cli: RelinkOptions) -> AutolinkDirectives {
         let ignoredSet = Set(cli.ignoredAutolinkDependencies)
-        guard !ignoredSet.isEmpty else {
-            return auto
-        }
 
         return AutolinkDirectives(
             frameworkPaths: auto.frameworkPaths,
             libraryPaths: auto.libraryPaths,
             frameworks: auto.frameworks.subtracting(ignoredSet),
             weakFrameworks: auto.weakFrameworks.subtracting(ignoredSet),
-            libraries: auto.libraries.subtracting(ignoredSet),
+            // `clang -dynamiclib` always supplies `-lSystem`; adding an auto-linked copy only creates a duplicate warning.
+            libraries: auto.libraries.subtracting(ignoredSet).subtracting(["System"]),
             weakLibraries: auto.weakLibraries.subtracting(ignoredSet),
         )
     }
@@ -98,13 +96,22 @@ final class ClangLinker {
     func buildDynamicSlice(context: DynamicSliceLinkContext) async throws {
         // Build the clang argument list for this architecture.
         var arguments = [
+            // Produce a Mach-O dynamic library instead of an executable.
             "-dynamiclib",
+            // Restrict this invocation to the current slice of a universal input.
             "-arch", context.architecture,
+            // Resolve SDK frameworks and libraries against the selected Apple platform SDK.
             "-isysroot", context.sdkPath,
+            // Write the requested LC_ID_DYLIB value into the output binary.
             "-install_name", context.installName,
+            // Load Objective-C categories from the extracted object files.
             "-ObjC",
+            // Link every extracted archive member rather than relying on archive member selection.
             "-all_load",
+            // Remove unreachable code and data from the resulting dynamic library.
             "-Wl,-dead_strip",
+            // Object files retain their `LC_LINKER_OPTION` records. Dependencies below are the filtered replacement.
+            "-Wl,-ignore_auto_link",
         ]
 
         // Framework search paths discovered from LC_LINKER_OPTION / Swift autolink sections.

@@ -27,8 +27,11 @@ final class ArchiveExtractor {
         try environment.files.createDirectory(at: outputDirectoryURL)
         let duplicateTracker = NativeObjectDuplicateTracker(machoEditor: machoEditor)
 
+        let members = try archiveReader.members(in: archiveData)
+        let orderedMembers = canonicalMemberOrder(members)
+
         var extractedObjectFiles: [URL] = []
-        for member in try archiveReader.members(in: archiveData) {
+        for member in orderedMembers {
             let outputURL = try process(
                 member: member,
                 outputDirectoryURL: outputDirectoryURL,
@@ -50,6 +53,22 @@ final class ArchiveExtractor {
 }
 
 private extension ArchiveExtractor {
+    /// Establishes a reproducible owner for duplicate symbols independent of physical `ar` member order.
+    ///
+    /// Before localizing a repeated symbol, process members by their normalized name and then by their bytes,
+    /// so this tool's fallback choice cannot change merely because the archive was repacked.
+    func canonicalMemberOrder(
+        _ members: [ArArchiveMember],
+    ) -> [ArArchiveMember] {
+        members.sorted { lhs, rhs in
+            if lhs.name != rhs.name {
+                return lhs.name < rhs.name
+            }
+
+            return lhs.payloadSHA256 < rhs.payloadSHA256
+        }
+    }
+
     /// Processes one archive member: filters, deduplicates, patches, and writes the object file.
     func process(
         member: ArArchiveMember,
@@ -67,7 +86,7 @@ private extension ArchiveExtractor {
         }
 
         // Drop only byte-identical objects and prepare duplicate definitions for localization.
-        let duplicateInfo = duplicateTracker.inspect(member.payload)
+        let duplicateInfo = duplicateTracker.inspect(member.payload, digest: member.payloadSHA256)
         if duplicateInfo.shouldSkipObject {
             return nil
         }

@@ -5,12 +5,21 @@ import Yams
 /// Filters auto-detected framework dependencies that the selected SDK does not allow direct clients to link.
 final class AutolinkFrameworkFilter {
     private let fileManager: FileManager
+    private let jsonDecoder: JSONDecoder
     private let yamlDecoder: YAMLDecoder
+    private let logger: Logger
 
     /// Creates a filter with an injectable file manager so tests can provide an isolated SDK-like filesystem.
-    init(fileManager: FileManager = .default, yamlDecoder: YAMLDecoder = YAMLDecoder()) {
+    init(
+        fileManager: FileManager = .default,
+        jsonDecoder: JSONDecoder = JSONDecoder(),
+        yamlDecoder: YAMLDecoder = YAMLDecoder(),
+        logger: Logger = Logger(label: "dylib-forge.autolink-filter"),
+    ) {
         self.fileManager = fileManager
+        self.jsonDecoder = jsonDecoder
         self.yamlDecoder = yamlDecoder
+        self.logger = logger
     }
 
     /// Returns frameworks that are safe to pass to the linker as auto-detected dependencies.
@@ -97,22 +106,49 @@ private extension AutolinkFrameworkFilter {
         }
     }
 
-    /// Decodes the TAPI YAML document and returns the client list that applies to this architecture/platform.
+    /// Decodes a TAPI JSON or YAML document and returns the client list that applies to this architecture/platform.
     func parseAllowedClients(fromTBDStub stub: String, target: String) -> Set<String>? {
-        guard let metadata = try? yamlDecoder.decode(TBDMetadata.self, from: stub),
-              let allowableClients = metadata.allowableClients
-        else {
-            return nil
+        let jsonAllowableClients = jsonAllowableClients(in: stub) // TAPI v5+
+        let yamlAllowableClients = yamlAllowableClients(in: stub) // TAPI v4
+        if let allowableClients = jsonAllowableClients ?? yamlAllowableClients {
+            return filteredClients(from: allowableClients, target: target)
         }
 
-        return Set(
+        return nil
+    }
+
+    /// Applies the current TAPI target selection to a v4/v5 client allowlist.
+    func filteredClients(from allowableClients: [TBDAllowableClients], target: String) -> Set<String> {
+        Set(
             allowableClients
-                .filter { entry in
-                    entry.targets?.contains(target) ?? true
-                }
+                .filter { entry in entry.targets?.contains(target) ?? true }
                 .flatMap(\.clients)
                 .filter { $0 != "-allowable_client" },
         )
+    }
+
+    /// Decodes TAPI v5 JSON. Newer JSON versions deliberately reuse this model until their schema changes.
+    func jsonAllowableClients(in stub: String) -> [TBDAllowableClients]? {
+        let data = Data(stub.utf8)
+        guard let metadata = try? jsonDecoder.decode(TBDJSONMetadata.self, from: data),
+              metadata.version >= 5
+        else {
+            return nil
+        }
+        if metadata.version > 5 {
+            logger.warning("TAPI JSON v\(metadata.version) is not explicitly supported; using the v5 decoder.")
+        }
+        return metadata.allowableClients
+    }
+
+    /// Decodes TAPI v4 YAML only after its version marker confirms the schema.
+    func yamlAllowableClients(in stub: String) -> [TBDAllowableClients]? {
+        guard let metadata = try? yamlDecoder.decode(TBDYAMLMetadata.self, from: stub),
+              metadata.version == 4
+        else {
+            return nil
+        }
+        return metadata.allowableClients
     }
 }
 
@@ -126,13 +162,38 @@ private enum FrameworkLinkability {
     case linkable(allowedClients: Set<String>?)
 }
 
-/// Partial TAPI `.tbd` document decoded only for its direct-link client restrictions.
-private struct TBDMetadata: Decodable {
-    /// Per-target client allowlists declared by the stub, if it restricts direct linkage.
-    let allowableClients: [TBDAllowableClients]?
+/// TAPI v4 YAML document with a top-level direct-link client allowlist.
+private struct TBDYAMLMetadata: Decodable {
+    let version: Int
+    let allowableClients: [TBDAllowableClients]
 
     enum CodingKeys: String, CodingKey {
+        case version = "tbd-version"
         case allowableClients = "allowable-clients"
+    }
+}
+
+/// TAPI v5 JSON document with a nested main-library record.
+private struct TBDJSONMetadata: Decodable {
+    let version: Int
+    let mainLibrary: TBDJSONMainLibrary
+
+    var allowableClients: [TBDAllowableClients] {
+        mainLibrary.allowableClients
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case version = "tapi_tbd_version"
+        case mainLibrary = "main_library"
+    }
+}
+
+/// TAPI v5's main-library record.
+private struct TBDJSONMainLibrary: Decodable {
+    let allowableClients: [TBDAllowableClients]
+
+    enum CodingKeys: String, CodingKey {
+        case allowableClients = "allowable_clients"
     }
 }
 

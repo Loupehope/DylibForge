@@ -13,10 +13,10 @@ final class NativeObjectDuplicateTracker {
     }
 
     /// Returns the object-file decision: skip byte-identical objects or privatize selected symbols.
-    func inspect(_ payload: Data) -> NativeDuplicateInfo {
+    func inspect(_ payload: Data, digest: String) -> NativeDuplicateInfo {
         let definitions = machoEditor.externalNativeDefinitionNames(in: payload)
         let duplicateDefinitions = definitions.intersection(seenDefinitions)
-        let shouldSkipObject = isByteIdenticalDuplicate(payload)
+        let shouldSkipObject = isByteIdenticalDuplicate(digest)
         return NativeDuplicateInfo(
             definitions: definitions,
             duplicateDefinitions: duplicateDefinitions,
@@ -32,8 +32,7 @@ final class NativeObjectDuplicateTracker {
 
 private extension NativeObjectDuplicateTracker {
     /// Treats an object as a full duplicate only when the original member bytes are identical.
-    func isByteIdenticalDuplicate(_ payload: Data) -> Bool {
-        let digest = SHA256.hash(data: payload).map { String(format: "%02x", $0) }.joined()
+    func isByteIdenticalDuplicate(_ digest: String) -> Bool {
         let inserted = seenObjectPayloadDigests.insert(digest).inserted
         return !inserted
     }

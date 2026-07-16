@@ -52,23 +52,3 @@ final class MachOEditor {
         autolinkParser.parseSwiftAutolinkEntries(in: data)
     }
 }
-
-/// Constants from `mach-o/loader.h` and `mach-o/nlist.h` used by the local Mach-O parser.
-enum MachOConstants {
-    static let mhMagic: UInt32 = 0xFEED_FACE
-    static let mhMagic64: UInt32 = 0xFEED_FACF
-    static let mhObject: UInt32 = 0x1
-    static let mhDylib: UInt32 = 0x6
-
-    static let nStabMask: UInt8 = 0xE0
-    static let nPext: UInt8 = 0x10
-    static let nExt: UInt8 = 0x01
-    static let nTypeMask: UInt8 = 0x0E
-    static let nUndef: UInt8 = 0x00
-    static let nWeakDef: UInt16 = 0x0080
-
-    static let lcSegment: UInt32 = 0x1
-    static let lcSegment64: UInt32 = 0x19
-    static let lcSymtab: UInt32 = 0x2
-    static let lcLinkerOption: UInt32 = 0x2D
-}

@@ -1,67 +1,34 @@
 import Foundation
 
-/// Describes the basic Mach-O header layout: 32/64-bit mode and header size.
-struct MachOLayout {
-    let is64Bit: Bool
-    let headerSize: Int
-}
-
-/// Represents one load command with its file offset.
-struct MachOLoadCommand {
-    let command: UInt32
-    let commandSize: Int
-    let offset: Int
-}
-
-/// Stores `LC_SYMTAB` coordinates: symbol table and string table locations.
-struct MachOSymbolTableInfo {
-    let symbolTableOffset: Int
-    let symbolCount: Int
-    let stringTableOffset: Int
-}
-
-/// One Mach-O section in the same one-based order used by `nlist.n_sect`.
-struct MachOSection {
-    let index: Int
-    let segmentName: String
-    let sectionName: String
-
-    var isObjCMetadataSection: Bool {
-        segmentName.lowercased().hasPrefix("__objc") || sectionName.lowercased().hasPrefix("__objc")
-    }
-}
-
 /// Safe low-level reader for the small Mach-O subset this tool needs.
 final class MachOReader {
     let data: Data
+    let layout: MachOLayout?
 
     /// Accepts Mach-O bytes and dependencies for reading constants and strings.
     init(data: Data) {
         self.data = data
-    }
-
-    /// Detects the Mach-O format from magic bytes and returns the layout for subsequent reads.
-    var layout: MachOLayout? {
         guard data.count >= 4 else {
-            return nil
+            layout = nil
+            return
         }
 
-        switch readUnalignedUInt32(at: 0) {
-        case MachOConstants.mhMagic64.littleEndian:
-            return MachOLayout(is64Bit: true, headerSize: 32)
-        case MachOConstants.mhMagic.littleEndian:
-            return MachOLayout(is64Bit: false, headerSize: 28)
+        switch Self.readLittleEndianUInt32(in: data, at: 0) {
+        case MachOConstants.mhMagic64:
+            layout = MachOLayout(is64Bit: true, headerSize: MachOLayout.headerSize64)
+        case MachOConstants.mhMagic:
+            layout = MachOLayout(is64Bit: false, headerSize: MachOLayout.headerSize32)
         default:
-            return nil
+            layout = nil
         }
     }
 
     /// Reads `filetype` from the Mach-O header when the file looks like a supported Mach-O.
     var fileType: UInt32? {
-        guard layout != nil else {
+        guard let layout, data.count >= layout.headerSize else {
             return nil
         }
-        return readUInt32(at: 12)
+        return readUInt32(at: MachOLayout.fileTypeOffset)
     }
 
     /// Returns `true` when the file is a relocatable object (`MH_OBJECT`).
@@ -75,18 +42,26 @@ final class MachOReader {
             return nil
         }
 
-        let commandCount = Int(readUInt32(at: 16))
+        let commandCount = Int(readUInt32(at: MachOLayout.commandCountOffset))
+        let commandsSize = Int(readUInt32(at: MachOLayout.commandsSizeOffset))
         var offset = layout.headerSize
+        guard range(offset: offset, size: commandsSize) != nil else {
+            return nil
+        }
+        let commandsEnd = offset + commandsSize
         var commands: [MachOLoadCommand] = []
 
         for _ in 0 ..< commandCount {
-            guard offset + 8 <= data.count else {
+            guard offset + MachOLoadCommandLayout.headerSize <= commandsEnd else {
                 return nil
             }
 
             let command = readUInt32(at: offset)
-            let commandSize = Int(readUInt32(at: offset + 4))
-            guard commandSize > 0, offset + commandSize <= data.count else {
+            let commandSize = Int(readUInt32(at: offset + MachOLoadCommandLayout.sizeField))
+            guard commandSize >= MachOLoadCommandLayout.headerSize,
+                  commandSize.isMultiple(of: 4),
+                  commandSize <= commandsEnd - offset
+            else {
                 return nil
             }
 
@@ -94,7 +69,7 @@ final class MachOReader {
             offset += commandSize
         }
 
-        return commands
+        return offset == commandsEnd ? commands : nil
     }
 
     /// Finds `LC_SYMTAB` and returns symbol table and string table coordinates.
@@ -104,17 +79,35 @@ final class MachOReader {
         }
 
         for command in commands where command.command == MachOConstants.lcSymtab {
+            guard let layout, command.commandSize >= MachOSymtabCommandLayout.size else {
+                return nil
+            }
+
+            let symbolTableOffset = Int(readUInt32(at: command.offset + MachOSymtabCommandLayout.symbolTableOffsetField))
+            let symbolCount = Int(readUInt32(at: command.offset + MachOSymtabCommandLayout.symbolCountField))
+            let stringTableOffset = Int(readUInt32(at: command.offset + MachOSymtabCommandLayout.stringTableOffsetField))
+            let stringTableSize = Int(readUInt32(at: command.offset + MachOSymtabCommandLayout.stringTableSizeField))
+            let symbolEntrySize = MachOSymbolLayout.entrySize(for: layout)
+            guard symbolCount <= Int.max / symbolEntrySize,
+                  range(offset: symbolTableOffset, size: symbolCount * symbolEntrySize) != nil,
+                  range(offset: stringTableOffset, size: stringTableSize) != nil
+            else {
+                return nil
+            }
+
             return MachOSymbolTableInfo(
-                symbolTableOffset: Int(readUInt32(at: command.offset + 8)),
-                symbolCount: Int(readUInt32(at: command.offset + 12)),
-                stringTableOffset: Int(readUInt32(at: command.offset + 16)),
+                symbolTableOffset: symbolTableOffset,
+                symbolCount: symbolCount,
+                stringTableOffset: stringTableOffset,
+                stringTableSize: stringTableSize,
             )
         }
 
         return nil
     }
 
-    /// Returns all section headers in the same one-based order used by symbol table entries.
+    /// Returns section headers in the same one-based order used by symbol table entries.
+    /// Invalid or unsupported input has no usable sections and therefore returns an empty array.
     func sections() -> [MachOSection] {
         guard let layout, let commands = loadCommands() else {
             return []
@@ -122,22 +115,29 @@ final class MachOReader {
 
         var sections: [MachOSection] = []
         for command in commands {
-            let segmentInfo = segmentSectionInfo(command: command, is64Bit: layout.is64Bit)
+            let segmentInfo = segmentSectionInfo(command: command, layout: layout)
             guard let segmentInfo else {
+                if command.command == MachOConstants.lcSegment || command.command == MachOConstants.lcSegment64 {
+                    return []
+                }
                 continue
             }
 
             for sectionIndex in 0 ..< segmentInfo.sectionCount {
                 let sectionOffset = segmentInfo.sectionsOffset + (sectionIndex * segmentInfo.sectionSize)
-                guard sectionOffset + segmentInfo.sectionSize <= data.count else {
-                    return sections
+                guard sectionOffset <= data.count - segmentInfo.sectionSize,
+                      let byteSize = sectionByteSize(at: sectionOffset, layout: segmentInfo.layout)
+                else {
+                    return []
                 }
 
                 sections.append(
                     MachOSection(
                         index: sections.count + 1,
-                        segmentName: fixedString(at: sectionOffset + 16, length: 16),
-                        sectionName: fixedString(at: sectionOffset, length: 16),
+                        segmentName: fixedString(at: sectionOffset + segmentInfo.layout.sectionSegmentNameField, length: MachOSegmentLayout.fixedNameLength),
+                        sectionName: fixedString(at: sectionOffset + segmentInfo.layout.sectionNameField, length: MachOSegmentLayout.fixedNameLength),
+                        fileOffset: Int(readUInt32(at: sectionOffset + segmentInfo.layout.sectionFileOffsetField)),
+                        byteSize: byteSize,
                     ),
                 )
             }
@@ -152,34 +152,33 @@ final class MachOReader {
             return []
         }
 
-        let nlistSize = layout.is64Bit ? 16 : 12
-        return (0 ..< symbolTable.symbolCount).compactMap { index in
-            let offset = symbolTable.symbolTableOffset + (index * nlistSize)
-            return offset + nlistSize <= data.count ? offset : nil
+        let entrySize = MachOSymbolLayout.entrySize(for: layout)
+        return (0 ..< symbolTable.symbolCount).map { index in
+            symbolTable.symbolTableOffset + (index * entrySize)
         }
     }
 
     /// Reads a little-endian `UInt16` from an arbitrary offset.
     func readUInt16(at offset: Int) -> UInt16 {
-        UInt16(littleEndian: readUnalignedUInt16(at: offset))
+        readLittleEndianUInt16(at: offset)
     }
 
     /// Reads a little-endian `UInt32` from an arbitrary offset.
     func readUInt32(at offset: Int) -> UInt32 {
-        UInt32(littleEndian: readUnalignedUInt32(at: offset))
+        readLittleEndianUInt32(at: offset)
     }
 
     /// Reads a little-endian `UInt64` from an arbitrary offset.
     func readUInt64(at offset: Int) -> UInt64 {
-        UInt64(littleEndian: readUnalignedUInt64(at: offset))
+        readLittleEndianUInt64(at: offset)
     }
 
     /// Reads a null-terminated C string from the Mach-O string table.
-    func cString(at offset: Int) -> String? {
-        guard offset >= 0, offset < data.count else {
+    func cString(at offset: Int, before endOffset: Int) -> String? {
+        guard offset >= 0, offset < endOffset, endOffset <= data.count else {
             return nil
         }
-        guard let zeroIndex = data[offset ..< data.count].firstIndex(of: 0) else {
+        guard let zeroIndex = data[offset ..< endOffset].firstIndex(of: 0) else {
             return nil
         }
         return data[offset ..< zeroIndex].utf8
@@ -196,8 +195,8 @@ final class MachOReader {
         return bytes[bytes.startIndex ..< endIndex].utf8
     }
 
-    /// Reads `UInt32` byte-by-byte without requiring pointer alignment.
-    func readUnalignedUInt32(at offset: Int) -> UInt32 {
+    /// Reads a little-endian `UInt32` byte-by-byte without requiring pointer alignment.
+    func readLittleEndianUInt32(at offset: Int) -> UInt32 {
         guard offset >= 0, offset + 4 <= data.count else {
             assertionFailure("Out-of-bounds UInt32 read at offset \(offset), dataSize=\(data.count)")
             return 0
@@ -210,8 +209,8 @@ final class MachOReader {
         return b0 | b1 | b2 | b3
     }
 
-    /// Reads `UInt16` byte-by-byte without requiring pointer alignment.
-    func readUnalignedUInt16(at offset: Int) -> UInt16 {
+    /// Reads a little-endian `UInt16` byte-by-byte without requiring pointer alignment.
+    func readLittleEndianUInt16(at offset: Int) -> UInt16 {
         guard offset >= 0, offset + 2 <= data.count else {
             assertionFailure("Out-of-bounds UInt16 read at offset \(offset), dataSize=\(data.count)")
             return 0
@@ -222,46 +221,68 @@ final class MachOReader {
         return b0 | b1
     }
 
-    /// Reads `UInt64` byte-by-byte without requiring pointer alignment.
-    func readUnalignedUInt64(at offset: Int) -> UInt64 {
+    /// Reads a little-endian `UInt64` byte-by-byte without requiring pointer alignment.
+    func readLittleEndianUInt64(at offset: Int) -> UInt64 {
         guard offset >= 0, offset + 8 <= data.count else {
             assertionFailure("Out-of-bounds UInt64 read at offset \(offset), dataSize=\(data.count)")
             return 0
         }
 
-        let lower = UInt64(readUnalignedUInt32(at: offset))
-        let upper = UInt64(readUnalignedUInt32(at: offset + 4)) << 32
+        let lower = UInt64(readLittleEndianUInt32(at: offset))
+        let upper = UInt64(readLittleEndianUInt32(at: offset + 4)) << 32
         return lower | upper
+    }
+
+    /// Returns a file range without allowing integer overflow in `offset + size`.
+    func range(offset: Int, size: Int) -> Range<Int>? {
+        guard offset >= 0, size >= 0, offset <= data.count, size <= data.count - offset else {
+            return nil
+        }
+        return offset ..< (offset + size)
+    }
+
+    private static func readLittleEndianUInt32(in data: Data, at offset: Int) -> UInt32 {
+        let b0 = UInt32(data[offset])
+        let b1 = UInt32(data[offset + 1]) << 8
+        let b2 = UInt32(data[offset + 2]) << 16
+        let b3 = UInt32(data[offset + 3]) << 24
+        return b0 | b1 | b2 | b3
     }
 }
 
 private extension MachOReader {
+    /// Reads the `size` field from a `section` / `section_64` record without narrowing a large 64-bit value.
+    func sectionByteSize(at sectionOffset: Int, layout: MachOSegmentLayout) -> Int? {
+        if layout.sectionByteSizeIs64Bit {
+            return Int(exactly: readUInt64(at: sectionOffset + layout.sectionByteSizeField))
+        }
+        return Int(readUInt32(at: sectionOffset + layout.sectionByteSizeField))
+    }
+
     /// Extracts the section table coordinates from `LC_SEGMENT` or `LC_SEGMENT_64`.
-    func segmentSectionInfo(command: MachOLoadCommand, is64Bit: Bool) -> (
+    func segmentSectionInfo(command: MachOLoadCommand, layout: MachOLayout) -> (
         sectionCount: Int,
         sectionsOffset: Int,
         sectionSize: Int,
+        layout: MachOSegmentLayout,
     )? {
-        if is64Bit {
-            guard command.command == MachOConstants.lcSegment64, command.commandSize >= 72 else {
-                return nil
-            }
-
-            return (
-                sectionCount: Int(readUInt32(at: command.offset + 64)),
-                sectionsOffset: command.offset + 72,
-                sectionSize: 80,
-            )
+        let segmentLayout = layout.is64Bit ? MachOSegmentLayout.bit64 : MachOSegmentLayout.bit32
+        guard command.command == segmentLayout.command,
+              command.commandSize >= segmentLayout.commandHeaderSize
+        else {
+            return nil
         }
 
-        guard command.command == MachOConstants.lcSegment, command.commandSize >= 56 else {
+        let sectionCount = Int(readUInt32(at: command.offset + segmentLayout.sectionCountField))
+        guard sectionCount <= (command.commandSize - segmentLayout.commandHeaderSize) / segmentLayout.sectionRecordSize else {
             return nil
         }
 
         return (
-            sectionCount: Int(readUInt32(at: command.offset + 48)),
-            sectionsOffset: command.offset + 56,
-            sectionSize: 68,
+            sectionCount: sectionCount,
+            sectionsOffset: command.offset + segmentLayout.commandHeaderSize,
+            sectionSize: segmentLayout.sectionRecordSize,
+            layout: segmentLayout,
         )
     }
 }

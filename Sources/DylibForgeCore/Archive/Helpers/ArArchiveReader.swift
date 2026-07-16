@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// Reads a Unix `ar` archive and converts its members into convenient objects.
@@ -134,12 +135,14 @@ private extension ArArchiveReader {
 struct ArArchiveMember {
     let name: String
     let payload: Data
+    let payloadSHA256: String
     let dataEnd: Int
 
     /// Stores the member name, contents, and data end in the source archive.
     init(name: String, payload: Data, dataEnd: Int) {
         self.name = name
         self.payload = payload
+        payloadSHA256 = SHA256.hash(data: payload).map { String(format: "%02x", $0) }.joined()
         self.dataEnd = dataEnd
     }
 
