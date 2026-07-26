@@ -14,8 +14,6 @@ final class CommandExecutor {
             throw DylibForgeError.message("Shell command is empty")
         }
 
-        logger.info("Running command: \(displayCommand(arguments))")
-
         let result = try await Subprocess.run(
             .name(executable),
             arguments: Arguments(Array(arguments.dropFirst())),

@@ -92,7 +92,12 @@ private extension ArchiveExtractor {
         }
 
         // Patch symbol visibility and localize duplicate definitions before writing the object file.
-        let outputURL = outputDirectoryURL.appendingPathComponent(outputFileName(for: member.baseName, index: outputIndex))
+        let outputURL = outputDirectoryURL.appendingPathComponent(
+            outputFileName(
+                payloadDigest: member.payloadSHA256,
+                index: outputIndex,
+            ),
+        )
         var patchedBuffer = member.payload
         machoEditor.patchObjCSymbolVisibility(in: &patchedBuffer)
         machoEditor.makeExternalNativeDefinitionsLocal(
@@ -118,9 +123,8 @@ private extension ArchiveExtractor {
             .contains { member.baseName.contains($0) }
     }
 
-    /// Returns the output object-file name with a stable numeric prefix.
-    func outputFileName(for baseName: String, index: Int) -> String {
-        let normalizedBaseName = baseName.hasSuffix(".o") ? baseName : "\(baseName).o"
-        return String(format: "%05d_%@", index, normalizedBaseName)
+    /// Returns a stable, file-system-safe object-file name independent of archive member encoding.
+    func outputFileName(payloadDigest: String, index: Int) -> String {
+        String(format: "%05d_%@.o", index, payloadDigest)
     }
 }

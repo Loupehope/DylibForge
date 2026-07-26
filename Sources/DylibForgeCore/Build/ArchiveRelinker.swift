@@ -22,14 +22,14 @@ final class ArchiveRelinker {
     }
 
     /// Main CLI entry point.
-    func run(inputPath: String, outputPath: String, sdk: String, overrides: RelinkOptions) async throws {
+    func run(inputPath: String, outputPath: String, sdk: String, overrides: RelinkOptions) async throws -> RelinkResult {
         let inputURL = URL(fileURLWithPath: inputPath).standardizedFileURL
         let destination = URL(fileURLWithPath: outputPath).standardizedFileURL
         let target = try resolveArchive(at: inputURL, sdk: sdk, outputURL: destination)
         let outputBinaryName = target.outputBinaryName
         let installName = try resolvedInstallName(overrides.installName)
 
-        try await relinkArchive(
+        return try await relinkArchive(
             target: target,
             outputBinaryName: outputBinaryName,
             installName: installName,
@@ -47,9 +47,8 @@ private extension ArchiveRelinker {
         installName: String,
         overrides: RelinkOptions,
         outputFileURL: URL,
-    ) async throws {
-        logger.notice("Build started")
-        logger.info("Input archive: \(target.inputURL.path)")
+    ) async throws -> RelinkResult {
+        logger.notice("Build started: \(target.inputURL.path)")
 
         // Keep all intermediate slices and unpacked objects in one disposable workspace.
         let temporaryRoot = environment.files.temporaryDirectory.appendingPathComponent("dylib_forge_\(UUID().uuidString)")
@@ -61,6 +60,7 @@ private extension ArchiveRelinker {
 
         // Build or copy one dynamic slice per architecture.
         var dynamicSlices: [URL] = []
+        var skippedArchitectures: [String] = []
         for architecture in slices.architectures {
             let dynamicSliceURL = try await buildArchitectureSlice(
                 target: target,
@@ -70,7 +70,15 @@ private extension ArchiveRelinker {
                 installName: installName,
                 overrides: overrides,
             )
-            dynamicSlices.append(dynamicSliceURL)
+            if let dynamicSliceURL {
+                dynamicSlices.append(dynamicSliceURL)
+            } else {
+                skippedArchitectures.append(architecture)
+            }
+        }
+
+        guard !dynamicSlices.isEmpty else {
+            throw DylibForgeError.message("None of the input architectures are supported by the selected Xcode: \(target.inputURL.path)")
         }
 
         // Merge rebuilt slices back into the final binary shape.
@@ -90,6 +98,10 @@ private extension ArchiveRelinker {
         }
         try environment.files.copyItem(at: mergedBinaryURL, to: outputFileURL)
         logger.notice("Build finished: \(outputFileURL.path)")
+        return RelinkResult(
+            linkedArchitectures: slices.architectures.filter { !skippedArchitectures.contains($0) },
+            skippedArchitectures: skippedArchitectures,
+        )
     }
 
     /// Produces a dynamic dylib for one architecture slice.
@@ -100,7 +112,7 @@ private extension ArchiveRelinker {
         temporaryRoot: URL,
         installName: String,
         overrides: RelinkOptions,
-    ) async throws -> URL {
+    ) async throws -> URL? {
         let thinArchiveURL = temporaryRoot.appendingPathComponent("\(architecture).a")
         let objectsDirectoryURL = temporaryRoot.appendingPathComponent("\(architecture)_objects", isDirectory: true)
         let dynamicSliceURL = temporaryRoot.appendingPathComponent("\(architecture).dylib")
@@ -117,6 +129,13 @@ private extension ArchiveRelinker {
         if machoEditor.isDynamicLibrary(thinBinary) {
             try environment.files.copyItem(at: thinArchiveURL, to: dynamicSliceURL)
             return dynamicSliceURL
+        }
+
+        guard await clangLinker.supportsArchitecture(
+            sdk: target.sdk,
+            architecture: architecture,
+        ) else {
+            return nil
         }
 
         // Extract native objects and combine auto-detected autolink directives with CLI overrides.

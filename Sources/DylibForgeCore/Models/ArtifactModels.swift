@@ -29,6 +29,17 @@ struct ExtractedObjects {
     let objectFiles: [URL]
 }
 
+/// Result of relinking one binary, including architecture slices omitted by the active Xcode toolchain.
+public struct RelinkResult: Sendable {
+    public let linkedArchitectures: [String]
+    public let skippedArchitectures: [String]
+
+    public init(linkedArchitectures: [String], skippedArchitectures: [String]) {
+        self.linkedArchitectures = linkedArchitectures
+        self.skippedArchitectures = skippedArchitectures
+    }
+}
+
 /// Resolved inputs for linking one architecture slice.
 struct DynamicSliceLinkContext {
     let sdk: String

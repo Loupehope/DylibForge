@@ -3,6 +3,7 @@ import Logging
 
 /// Drives architecture discovery, autolink extraction, and the final `clang -dynamiclib` invocation.
 final class ClangLinker {
+    private let logger = Logger(label: "dylib-forge.link")
     private let environment: ToolEnvironment
     private let machoEditor: MachOEditor
     private let directiveParser: AutolinkDirectiveParser
@@ -76,7 +77,11 @@ final class ClangLinker {
         linkerArgs: [String],
     ) async throws -> DynamicSliceLinkContext {
         let sdkPath = try await resolveSDKPath(for: sdk)
-        let targetTriples = try resolveTargetTriples(sdk: sdk, sdkPath: sdkPath, architecture: architecture)
+        let targetTriples = try resolveTargetTriples(
+            sdk: sdk,
+            sdkPath: sdkPath,
+            architecture: architecture,
+        )
 
         return DynamicSliceLinkContext(
             sdk: sdk,
@@ -90,6 +95,33 @@ final class ClangLinker {
             autolinkDirectives: autolinkDirectives,
             linkerArgs: linkerArgs,
         )
+    }
+
+    /// Checks whether the currently selected Xcode can resolve Swift target information for one architecture.
+    func supportsArchitecture(sdk: String, architecture: String) async -> Bool {
+        do {
+            let sdkPath = try await resolveSDKPath(for: sdk)
+            let targetTriples = try resolveTargetTriples(
+                sdk: sdk,
+                sdkPath: sdkPath,
+                architecture: architecture,
+            )
+            _ = try await environment.shell.run(
+                "xcrun",
+                "--sdk", sdk,
+                "swiftc",
+                "-target", targetTriples.swift,
+                "-print-target-info",
+            )
+            return true
+        } catch {
+            logger.warning("""
+            Skipping `\(architecture)` for `\(sdk)`: the selected Xcode cannot build this architecture. 
+            Its version or SDK support may be too new or too old:
+            \(error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines))
+            """)
+            return false
+        }
     }
 
     /// Links one architecture slice through `clang -dynamiclib`.
@@ -194,7 +226,11 @@ private extension ClangLinker {
     }
 
     /// Builds Swift and TAPI target triples from the selected SDK's own metadata.
-    func resolveTargetTriples(sdk: String, sdkPath: String, architecture: String) throws -> SDKTargetTriples {
+    func resolveTargetTriples(
+        sdk: String,
+        sdkPath: String,
+        architecture: String,
+    ) throws -> SDKTargetTriples {
         let settingsURL = URL(fileURLWithPath: sdkPath, isDirectory: true).appendingPathComponent("SDKSettings.plist")
         let settingsData = try Data(contentsOf: settingsURL)
         let settings = try PropertyListDecoder().decode(SDKSettings.self, from: settingsData)

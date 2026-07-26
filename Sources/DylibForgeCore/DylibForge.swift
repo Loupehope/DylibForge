@@ -1,12 +1,13 @@
 import Foundation
 
 public enum DylibForge {
+    @discardableResult
     public static func run(
         inputPath: String,
         outputPath: String,
         sdk: String,
         relinkOptions: RelinkOptions,
-    ) async throws {
+    ) async throws -> RelinkResult {
         let environment = ToolEnvironment()
         let machoEditor = MachOEditor()
         let archiveExtractor = ArchiveExtractor(
@@ -24,7 +25,7 @@ public enum DylibForge {
             machoEditor: machoEditor,
         )
 
-        try await relinker.run(
+        return try await relinker.run(
             inputPath: inputPath,
             outputPath: outputPath,
             sdk: sdk,
