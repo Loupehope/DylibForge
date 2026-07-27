@@ -4,14 +4,19 @@ import Logging
 
 /// Rebuilds one XCFramework artifact using the core archive relinker.
 final class XCFrameworkArtifactRelinker {
-    private let logger = Logger(label: "dylib-forge.xcframework")
+    private let logger: Logger
     private let files: XCFrameworkFiles
     private let dylibForge: DylibForge.Type
 
     /// Wires artifact rebuilding around shared file access and the core relinker entry point.
-    init(files: XCFrameworkFiles, dylibForge: DylibForge.Type) {
+    init(
+        files: XCFrameworkFiles,
+        dylibForge: DylibForge.Type,
+        logger: Logger = Logger(label: "dylib-forge.xcframework"),
+    ) {
         self.files = files
         self.dylibForge = dylibForge
+        self.logger = logger
     }
 
     /// Rebuilds one static archive or framework entry, leaving unsupported artifact forms untouched.

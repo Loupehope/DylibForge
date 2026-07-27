@@ -3,7 +3,7 @@ import Logging
 
 /// Orchestrates relinking a static archive into a dynamic Mach-O binary.
 final class ArchiveRelinker {
-    private let logger = Logger(label: "dylib-forge.build")
+    private let logger: Logger
     private let environment: ToolEnvironment
     private let archiveExtractor: ArchiveExtractor
     private let clangLinker: ClangLinker
@@ -14,11 +14,13 @@ final class ArchiveRelinker {
         archiveExtractor: ArchiveExtractor,
         clangLinker: ClangLinker,
         machoEditor: MachOEditor,
+        logger: Logger = Logger(label: "dylib-forge.build"),
     ) {
         self.environment = environment
         self.archiveExtractor = archiveExtractor
         self.clangLinker = clangLinker
         self.machoEditor = machoEditor
+        self.logger = logger
     }
 
     /// Main CLI entry point.

@@ -27,10 +27,21 @@ final class AutolinkFrameworkFilter {
     /// Some SDK stubs declare `allowable-clients`, which means `ld` rejects direct linkage from any other
     /// product. When that metadata exists, the framework is kept only if the linked product is explicitly listed.
     /// Frameworks without a readable stub, or without `allowable-clients`, are treated as public and kept.
-    func allowedFrameworks(_ frameworks: Set<String>, context: DynamicSliceLinkContext) -> [String] {
-        frameworks
-            .filter { isFrameworkAllowed($0, context: context) }
-            .sorted()
+    func allowedTBDFrameworks(_ frameworks: Set<String>, context: DynamicSliceLinkContext) -> Set<String> {
+        Set(frameworks.filter { isFrameworkAllowed($0, context: context) })
+    }
+
+    /// Finds Swift compatibility libraries whose SDK stubs are aliases for frameworks.
+    func allowedFrameworkAliases(forLibraries libraries: Set<String>, context: DynamicSliceLinkContext) -> [String: Set<FrameworkAlias>] {
+        Dictionary(
+            uniqueKeysWithValues: libraries.compactMap { library in
+                let frameworks = allowedFrameworkAliases(forLibrary: library, context: context)
+                guard !frameworks.isEmpty else {
+                    return nil
+                }
+                return (library, frameworks)
+            },
+        )
     }
 }
 
@@ -106,6 +117,68 @@ private extension AutolinkFrameworkFilter {
         }
     }
 
+    /// Returns the frameworks represented by a Swift compatibility-library stub.
+    func allowedFrameworkAliases(forLibrary library: String, context: DynamicSliceLinkContext) -> Set<FrameworkAlias> {
+        guard library.hasPrefix("swift") else {
+            return []
+        }
+
+        for rootURL in context.frameworkSearchRoots {
+            let stubURLs = [
+                rootURL.appendingPathComponent("System/Cryptexes/OS/usr/lib/swift/lib\(library).tbd"),
+                rootURL.appendingPathComponent("usr/lib/swift/lib\(library).tbd"),
+            ]
+            for stubURL in stubURLs {
+                guard let stub = try? String(contentsOf: stubURL, encoding: .utf8) else {
+                    continue
+                }
+
+                if let allowableClients = parseAllowedClients(fromTBDStub: stub, target: context.targetTriples.tbd), !allowableClients.contains(
+                    context.linkedProductName,
+                ) {
+                    continue
+                }
+
+                let frameworks = installNames(fromTBDStub: stub).compactMap {
+                    frameworkAlias(fromInstallName: $0, sdkRoot: rootURL)
+                }
+
+                if !frameworks.isEmpty {
+                    return Set(frameworks)
+                }
+            }
+        }
+
+        return []
+    }
+
+    /// Builds a framework name and its containing directory from an SDK install name.
+    func frameworkAlias(fromInstallName installName: String, sdkRoot: URL) -> FrameworkAlias? {
+        guard installName.hasPrefix("/") else {
+            return nil
+        }
+        let installURL = URL(fileURLWithPath: installName)
+        let components = installURL.pathComponents
+        guard let frameworkIndex = components.lastIndex(where: { $0.hasSuffix(".framework") }) else {
+            return nil
+        }
+
+        let frameworkComponent = components[frameworkIndex]
+        let frameworkName = String(frameworkComponent.dropLast(".framework".count))
+        guard components.last == frameworkName else {
+            return nil
+        }
+
+        var frameworkURL = installURL
+        while frameworkURL.lastPathComponent != frameworkComponent {
+            frameworkURL.deleteLastPathComponent()
+        }
+        let frameworkSearchRoot = sdkRoot.appendingPathComponent(
+            String(frameworkURL.deletingLastPathComponent().path.dropFirst()),
+        )
+        return FrameworkAlias(name: frameworkName, frameworkSearchRoot: frameworkSearchRoot)
+    }
+
     /// Decodes a TAPI JSON or YAML document and returns the client list that applies to this architecture/platform.
     func parseAllowedClients(fromTBDStub stub: String, target: String) -> Set<String>? {
         let jsonAllowableClients = jsonAllowableClients(in: stub) // TAPI v5+
@@ -115,6 +188,23 @@ private extension AutolinkFrameworkFilter {
         }
 
         return nil
+    }
+
+    /// Reads every install name from either current TAPI representation.
+    func installNames(fromTBDStub stub: String) -> [String] {
+        if let metadata = try? jsonDecoder.decode(TBDJSONMetadata.self, from: Data(stub.utf8)), metadata.version >= 5 {
+            if metadata.version > 5 {
+                logger.warning("TAPI JSON v\(metadata.version) is not explicitly supported; using the v5 decoder.")
+            }
+
+            return metadata.mainLibrary.installNames
+        }
+
+        if let metadata = try? yamlDecoder.decode(TBDYAMLMetadata.self, from: stub), metadata.version == 4 {
+            return [metadata.installName]
+        }
+
+        return []
     }
 
     /// Applies the current TAPI target selection to a v4/v5 client allowlist.
@@ -162,14 +252,23 @@ private enum FrameworkLinkability {
     case linkable(allowedClients: Set<String>?)
 }
 
+/// An SDK framework identified by a Swift compatibility-library stub.
+struct FrameworkAlias: Hashable {
+    let name: String
+    /// Directory containing the framework bundle, suitable for `-F` lookup.
+    let frameworkSearchRoot: URL
+}
+
 /// TAPI v4 YAML document with a top-level direct-link client allowlist.
 private struct TBDYAMLMetadata: Decodable {
     let version: Int
-    let allowableClients: [TBDAllowableClients]
+    let allowableClients: [TBDAllowableClients]?
+    let installName: String
 
     enum CodingKeys: String, CodingKey {
         case version = "tbd-version"
         case allowableClients = "allowable-clients"
+        case installName = "install-name"
     }
 }
 
@@ -178,7 +277,7 @@ private struct TBDJSONMetadata: Decodable {
     let version: Int
     let mainLibrary: TBDJSONMainLibrary
 
-    var allowableClients: [TBDAllowableClients] {
+    var allowableClients: [TBDAllowableClients]? {
         mainLibrary.allowableClients
     }
 
@@ -190,10 +289,26 @@ private struct TBDJSONMetadata: Decodable {
 
 /// TAPI v5's main-library record.
 private struct TBDJSONMainLibrary: Decodable {
-    let allowableClients: [TBDAllowableClients]
+    let allowableClients: [TBDAllowableClients]?
+    let installNames: [String]
 
     enum CodingKeys: String, CodingKey {
         case allowableClients = "allowable_clients"
+        case installNames = "install_names"
+        case name
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        allowableClients = try container.decodeIfPresent([TBDAllowableClients].self, forKey: .allowableClients)
+
+        var installNameEntries = try container.nestedUnkeyedContainer(forKey: .installNames)
+        var decodedInstallNames: [String] = []
+        while !installNameEntries.isAtEnd {
+            let entry = try installNameEntries.nestedContainer(keyedBy: CodingKeys.self)
+            try decodedInstallNames.append(entry.decode(String.self, forKey: .name))
+        }
+        installNames = decodedInstallNames
     }
 }
 

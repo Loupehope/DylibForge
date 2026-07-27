@@ -3,7 +3,7 @@ import Logging
 
 /// Drives architecture discovery, autolink extraction, and the final `clang -dynamiclib` invocation.
 final class ClangLinker {
-    private let logger = Logger(label: "dylib-forge.link")
+    private let logger: Logger
     private let environment: ToolEnvironment
     private let machoEditor: MachOEditor
     private let directiveParser: AutolinkDirectiveParser
@@ -15,11 +15,13 @@ final class ClangLinker {
         machoEditor: MachOEditor,
         directiveParser: AutolinkDirectiveParser = AutolinkDirectiveParser(),
         frameworkFilter: AutolinkFrameworkFilter = AutolinkFrameworkFilter(),
+        logger: Logger = Logger(label: "dylib-forge.link"),
     ) {
         self.environment = environment
         self.machoEditor = machoEditor
         self.directiveParser = directiveParser
         self.frameworkFilter = frameworkFilter
+        self.logger = logger
     }
 
     /// Returns the architecture list and fat/universal-file flag.
@@ -146,17 +148,29 @@ final class ClangLinker {
             "-Wl,-ignore_auto_link",
         ]
 
-        // Framework search paths discovered from LC_LINKER_OPTION / Swift autolink sections.
-        context.autolinkDirectives.frameworkPaths.forEach { arguments.append(contentsOf: ["-F", $0]) }
+        // Swift compatibility-library stubs can be aliases for public frameworks.
+        // `frameworkAliasesInfo` validates their allowable clients while it reads those stubs.
+        let frameworkAliasesInfo = frameworkFilter.allowedFrameworkAliases(
+            forLibraries: context.autolinkDirectives.libraries,
+            context: context,
+        )
+        let frameworkAliases = frameworkAliasesInfo.values.reduce(into: Set<FrameworkAlias>()) { $0.formUnion($1) }
+        let frameworkAliasPaths = Set(frameworkAliases.map(\.frameworkSearchRoot.path))
 
-        // Strong frameworks, filtered through SDK `.tbd` allowable-client metadata.
-        frameworkFilter.allowedFrameworks(
+        // Framework search paths discovered from LC_LINKER_OPTION / Swift autolink sections.
+        context.autolinkDirectives.frameworkPaths
+            .union(frameworkAliasPaths)
+            .forEach { arguments.append(contentsOf: ["-F", $0]) }
+
+        // Add already-validated framework aliases to the regular filtered frameworks.
+        let allowedStrongFrameworks = frameworkFilter.allowedTBDFrameworks(
             context.autolinkDirectives.frameworks,
             context: context,
-        ).forEach { arguments.append(contentsOf: ["-framework", $0]) }
+        ).union(frameworkAliases.map(\.name))
+        allowedStrongFrameworks.forEach { arguments.append(contentsOf: ["-framework", $0]) }
 
         // Weak frameworks use the same filtering, but keep their weak-linking semantics.
-        frameworkFilter.allowedFrameworks(
+        frameworkFilter.allowedTBDFrameworks(
             context.autolinkDirectives.weakFrameworks,
             context: context,
         ).forEach { arguments.append(contentsOf: ["-weak_framework", $0]) }
@@ -169,7 +183,10 @@ final class ClangLinker {
         swiftRuntimeLibraryPaths.forEach { arguments.append(contentsOf: ["-L", $0]) }
 
         // Auto-linked libraries and explicit user-supplied linker arguments.
-        context.autolinkDirectives.libraries.forEach { arguments.append("-l\($0)") }
+        let replacedLibraries = Set(frameworkAliasesInfo.map(\.key))
+        context.autolinkDirectives.libraries
+            .subtracting(replacedLibraries)
+            .forEach { arguments.append("-l\($0)") }
         context.autolinkDirectives.weakLibraries.forEach { arguments.append("-weak-l\($0)") }
         arguments.append(contentsOf: context.linkerArgs)
 

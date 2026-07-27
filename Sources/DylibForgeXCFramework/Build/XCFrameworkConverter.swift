@@ -4,14 +4,19 @@ import Logging
 
 /// Orchestrates copying an XCFramework and rebuilding its static artifacts.
 final class XCFrameworkConverter {
-    private let logger = Logger(label: "dylib-forge.xcframework")
+    private let logger: Logger
     private let files: XCFrameworkFiles
     private let artifactRelinker: XCFrameworkArtifactRelinker
 
     /// Wires the orchestration layer around file access and single-artifact rebuilding.
-    init(files: XCFrameworkFiles, artifactRelinker: XCFrameworkArtifactRelinker) {
+    init(
+        files: XCFrameworkFiles,
+        artifactRelinker: XCFrameworkArtifactRelinker,
+        logger: Logger = Logger(label: "dylib-forge.xcframework"),
+    ) {
         self.files = files
         self.artifactRelinker = artifactRelinker
+        self.logger = logger
     }
 
     /// Produces a fully copied, unsigned XCFramework with every supported static artifact rebuilt.

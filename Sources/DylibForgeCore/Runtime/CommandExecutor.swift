@@ -3,7 +3,11 @@ import Logging
 import Subprocess
 
 final class CommandExecutor {
-    private let logger = Logger(label: "dylib-forge.command")
+    private let logger: Logger
+
+    init(logger: Logger = Logger(label: "dylib-forge.command")) {
+        self.logger = logger
+    }
 
     func run(_ arguments: String...) async throws -> CommandResult {
         try await run(arguments: arguments)
