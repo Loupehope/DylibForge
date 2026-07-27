@@ -139,7 +139,10 @@ private extension AutolinkFrameworkFilter {
                     continue
                 }
 
-                let frameworks = installNames(fromTBDStub: stub).compactMap {
+                let frameworks = installNames(
+                    fromTBDStub: stub,
+                    target: context.targetTriples.tbd,
+                ).compactMap {
                     frameworkAlias(fromInstallName: $0, sdkRoot: rootURL)
                 }
 
@@ -182,7 +185,7 @@ private extension AutolinkFrameworkFilter {
     /// Decodes a TAPI JSON or YAML document and returns the client list that applies to this architecture/platform.
     func parseAllowedClients(fromTBDStub stub: String, target: String) -> Set<String>? {
         let jsonAllowableClients = jsonAllowableClients(in: stub) // TAPI v5+
-        let yamlAllowableClients = yamlAllowableClients(in: stub) // TAPI v4
+        let yamlAllowableClients = yamlAllowableClients(in: stub, target: target) // TAPI v4
         if let allowableClients = jsonAllowableClients ?? yamlAllowableClients {
             return filteredClients(from: allowableClients, target: target)
         }
@@ -191,17 +194,18 @@ private extension AutolinkFrameworkFilter {
     }
 
     /// Reads every install name from either current TAPI representation.
-    func installNames(fromTBDStub stub: String) -> [String] {
+    func installNames(fromTBDStub stub: String, target: String) -> [String] {
         if let metadata = try? jsonDecoder.decode(TBDJSONMetadata.self, from: Data(stub.utf8)), metadata.version >= 5 {
             if metadata.version > 5 {
                 logger.warning("TAPI JSON v\(metadata.version) is not explicitly supported; using the v5 decoder.")
             }
 
-            return metadata.mainLibrary.installNames
+            return metadata.mainLibrary.installNames.map(\.name)
         }
 
-        if let metadata = try? yamlDecoder.decode(TBDYAMLMetadata.self, from: stub), metadata.version == 4 {
-            return [metadata.installName]
+        let metadata = directYAMLMetadata(in: stub, target: target)
+        if !metadata.isEmpty {
+            return metadata.map(\.installName)
         }
 
         return []
@@ -232,13 +236,41 @@ private extension AutolinkFrameworkFilter {
     }
 
     /// Decodes TAPI v4 YAML only after its version marker confirms the schema.
-    func yamlAllowableClients(in stub: String) -> [TBDAllowableClients]? {
-        guard let metadata = try? yamlDecoder.decode(TBDYAMLMetadata.self, from: stub),
-              metadata.version == 4
-        else {
+    func yamlAllowableClients(in stub: String, target: String) -> [TBDAllowableClients]? {
+        let metadata = directYAMLMetadata(in: stub, target: target)
+        guard metadata.contains(where: { $0.allowableClients != nil }) else {
             return nil
         }
-        return metadata.allowableClients
+        return metadata.flatMap { $0.allowableClients ?? [] }
+    }
+
+    /// Removes documents that are explicitly declared as re-exports of another document in the same TAPI stream.
+    func directYAMLMetadata(in stub: String, target: String) -> [TBDYAMLMetadata] {
+        let metadata = yamlMetadata(in: stub).filter { $0.targets?.contains(target) ?? true }
+        let reexportedLibraries = Set(metadata.flatMap { document in
+            document.reexportedLibraries?
+                .filter { $0.targets?.contains(target) ?? true }
+                .flatMap(\.libraries) ?? []
+        })
+        return metadata.filter { !reexportedLibraries.contains($0.installName) }
+    }
+
+    /// Decodes every document in a TAPI v4 YAML stub.
+    ///
+    /// A stream can contain separate TAPI documents for re-exported libraries, so each document is decoded
+    /// independently with Yams' native multi-document parser.
+    func yamlMetadata(in stub: String) -> [TBDYAMLMetadata] {
+        guard let documents = try? Array(compose_all(yaml: stub)) else {
+            return []
+        }
+        return documents.compactMap { document in
+            guard let metadata = try? yamlDecoder.decode(TBDYAMLMetadata.self, from: document),
+                  metadata.version == 4
+            else {
+                return nil
+            }
+            return metadata
+        }
     }
 }
 
@@ -262,14 +294,24 @@ struct FrameworkAlias: Hashable {
 /// TAPI v4 YAML document with a top-level direct-link client allowlist.
 private struct TBDYAMLMetadata: Decodable {
     let version: Int
+    let targets: [String]?
     let allowableClients: [TBDAllowableClients]?
     let installName: String
+    let reexportedLibraries: [TBDReexportedLibraries]?
 
     enum CodingKeys: String, CodingKey {
         case version = "tbd-version"
+        case targets
         case allowableClients = "allowable-clients"
         case installName = "install-name"
+        case reexportedLibraries = "reexported-libraries"
     }
+}
+
+/// One TAPI v4 re-export declaration.
+private struct TBDReexportedLibraries: Decodable {
+    let targets: [String]?
+    let libraries: [String]
 }
 
 /// TAPI v5 JSON document with a nested main-library record.
@@ -290,26 +332,17 @@ private struct TBDJSONMetadata: Decodable {
 /// TAPI v5's main-library record.
 private struct TBDJSONMainLibrary: Decodable {
     let allowableClients: [TBDAllowableClients]?
-    let installNames: [String]
+    let installNames: [TBDInstallName]
 
     enum CodingKeys: String, CodingKey {
         case allowableClients = "allowable_clients"
         case installNames = "install_names"
-        case name
     }
+}
 
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        allowableClients = try container.decodeIfPresent([TBDAllowableClients].self, forKey: .allowableClients)
-
-        var installNameEntries = try container.nestedUnkeyedContainer(forKey: .installNames)
-        var decodedInstallNames: [String] = []
-        while !installNameEntries.isAtEnd {
-            let entry = try installNameEntries.nestedContainer(keyedBy: CodingKeys.self)
-            try decodedInstallNames.append(entry.decode(String.self, forKey: .name))
-        }
-        installNames = decodedInstallNames
-    }
+/// One TAPI v5 install-name entry.
+private struct TBDInstallName: Decodable {
+    let name: String
 }
 
 /// One architecture/platform-specific `allowable-clients` entry from a TAPI `.tbd` document.
