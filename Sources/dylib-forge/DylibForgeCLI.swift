@@ -8,6 +8,7 @@ struct DylibForgeCLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "dylib-forge",
         abstract: "Relink a static Apple ar archive into a dynamic Mach-O binary.",
+        version: "1.5.0",
     )
 
     @Argument(help: "Path to the input static ar archive or static framework binary.")
@@ -38,11 +39,11 @@ struct DylibForgeCLI: AsyncParsableCommand {
             inputPath: input,
             outputPath: output,
             sdk: sdk,
+            installName: installName,
             relinkOptions: RelinkOptions(
-                linkerArgs: linkerArg,
-                ignoredAutolinkDependencies: ignoreAutolink,
-                installName: installName,
-                excludedObjectNamePatterns: excludeObject,
+                linkerArgs: ScopedValues(base: linkerArg),
+                ignoredAutolinkDependencies: ScopedValues(base: ignoreAutolink),
+                excludedObjectNamePatterns: ScopedValues(base: excludeObject),
             ),
         )
     }

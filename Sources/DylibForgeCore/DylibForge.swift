@@ -6,6 +6,7 @@ public enum DylibForge {
         inputPath: String,
         outputPath: String,
         sdk: String,
+        installName: String,
         relinkOptions: RelinkOptions,
     ) async throws -> RelinkResult {
         let environment = ToolEnvironment()
@@ -29,6 +30,7 @@ public enum DylibForge {
             inputPath: inputPath,
             outputPath: outputPath,
             sdk: sdk,
+            installName: installName,
             overrides: relinkOptions,
         )
     }

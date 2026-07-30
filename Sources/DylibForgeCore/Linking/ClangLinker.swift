@@ -54,8 +54,13 @@ final class ClangLinker {
     }
 
     /// Merges auto-detected dependencies and CLI overrides.
-    func mergeAutolinkDirectives(auto: AutolinkDirectives, cli: RelinkOptions) -> AutolinkDirectives {
-        let ignoredSet = Set(cli.ignoredAutolinkDependencies)
+    func mergeAutolinkDirectives(
+        auto: AutolinkDirectives,
+        cli: RelinkOptions,
+        sdk: String,
+        architecture: String,
+    ) -> AutolinkDirectives {
+        let ignoredSet = Set(cli.ignoredAutolinkDependencies.values(for: sdk, architecture: architecture))
 
         return AutolinkDirectives(
             frameworkPaths: auto.frameworkPaths,

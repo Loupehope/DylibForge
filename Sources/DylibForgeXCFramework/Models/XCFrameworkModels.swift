@@ -51,6 +51,9 @@ struct XCFrameworkLibrary {
     /// Optional Xcode platform variant, such as `simulator` or `maccatalyst`.
     let supportedPlatformVariant: String?
 
+    /// Architectures covered by this artifact entry.
+    let supportedArchitectures: [String]
+
     /// Validates the fields necessary to locate an artifact inside the XCFramework.
     init(propertyList: [String: Any]) throws {
         guard let identifier = propertyList["LibraryIdentifier"] as? String,
@@ -65,6 +68,7 @@ struct XCFrameworkLibrary {
         self.libraryPath = libraryPath
         supportedPlatform = propertyList["SupportedPlatform"] as? String
         supportedPlatformVariant = propertyList["SupportedPlatformVariant"] as? String
+        supportedArchitectures = propertyList["SupportedArchitectures"] as? [String] ?? []
         artifactKind = XCFrameworkArtifactKind(path: libraryPath)
     }
 
@@ -74,10 +78,13 @@ struct XCFrameworkLibrary {
     }
 
     /// Resolves the artifact's absolute location inside an XCFramework copy.
-    func artifactURL(in xcframeworkURL: URL) -> URL {
-        xcframeworkURL
+    func artifactURL(in xcframeworkURL: URL) throws -> URL {
+        let rootURL = xcframeworkURL.standardizedFileURL.resolvingSymlinksInPath()
+        return rootURL
             .appendingPathComponent(identifier, isDirectory: true)
             .appendingPathComponent(libraryPath)
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
     }
 
     /// Records that a static archive has been replaced with a dynamic library.
@@ -97,7 +104,7 @@ struct XCFrameworkLibrary {
 }
 
 /// Artifact forms relevant to relinking inside an XCFramework.
-enum XCFrameworkArtifactKind {
+enum XCFrameworkArtifactKind: Equatable {
     case staticArchive
     case framework
     case other

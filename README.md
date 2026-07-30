@@ -20,8 +20,12 @@ dylib-forge-xc ./GoogleMaps.xcframework \
 
 | Argument | Required | Meaning |
 | --- | --- | --- |
-| `<input>` | Yes | Path to the source `.xcframework`. |
-| `--output <path>` | Yes | Path for the converted `.xcframework`. |
+| `<input>` | Yes | Source `.xcframework` path. |
+| `--output <path>` | Yes | Converted `.xcframework` path. |
+| `--linker-arg-sdk <sdk-or-arg>` | No | SDK name or `any` followed by raw linker arguments. |
+| `--ignore-autolink-sdk <sdk-or-name>` | No | SDK name or `any` followed by autolink dependency names to ignore. |
+| `--exclude-object-sdk <sdk-or-pattern>` | No | SDK name or `any` followed by archive object name patterns to exclude. |
+| `--xcframework-dependency <path>` | No | Dependency `.xcframework` path. Its matching platform, variant, and architecture slice is linked. |
 
 The command handles every supported static artifact in the XCFramework:
 
@@ -32,6 +36,53 @@ The command handles every supported static artifact in the XCFramework:
 
 > Mac Catalyst artifacts are not supported. They are omitted from the output XCFramework and its root `Info.plist`. The command logs a warning.
 
+### SDK-Specific Linker Arguments
+
+Use SDK-specific controls when linker arguments, ignored autolink dependencies, or excluded archive objects differ between SDKs:
+
+- Start each group with an SDK name or `any`.
+- DylibForge applies every following value to slices built with that SDK until it encounters another SDK name.
+- Values in an `any` group apply to every slice, and values from a specific SDK group are added only to that SDK's slices.
+
+```bash
+dylib-forge-xc ./Library.xcframework --output ./LibraryDynamic.xcframework \
+  --linker-arg-sdk any \
+  --linker-arg-sdk -lc++ \
+  --linker-arg-sdk iphoneos \
+  --linker-arg-sdk -framework \
+  --linker-arg-sdk CoreMedia \
+  --linker-arg-sdk iphonesimulator \
+  --linker-arg-sdk -Wl,-weak_framework,ARKit
+```
+
+This links `-lc++` for every slice, `CoreMedia` only for iOS-device slices, and weakly links `ARKit` only for Simulator slices.
+
+### Link Another XCFramework
+
+Use `--xcframework-dependency` when the dependency is itself an XCFramework. DylibForge finds the slice with the same platform, variant, and architecture as the library currently being rebuilt, then adds its framework search path and framework name to the linker invocation.
+
+```bash
+dylib-forge-xc ./Library.xcframework \
+  --output ./LibraryDynamic.xcframework \
+  --xcframework-dependency ./VendorSDK.xcframework
+```
+
+The same dependency can also be specified explicitly with `--linker-arg-sdk`:
+
+```bash
+dylib-forge-xc ./Library.xcframework --output ./LibraryDynamic.xcframework \
+  --linker-arg-sdk iphoneos \
+  --linker-arg-sdk -F \
+  --linker-arg-sdk ./VendorSDK.xcframework/ios-arm64 \
+  --linker-arg-sdk -framework \
+  --linker-arg-sdk VendorSDK \
+  --linker-arg-sdk iphonesimulator \
+  --linker-arg-sdk -F \
+  --linker-arg-sdk ./VendorSDK.xcframework/ios-arm64_x86_64-simulator \
+  --linker-arg-sdk -framework \
+  --linker-arg-sdk VendorSDK
+```
+
 ## Convert One Archive or Framework Binary
 
 Use `dylib-forge` to convert one standalone archive or framework executable. The output path may be the same as the input path.
@@ -40,7 +91,10 @@ Use `dylib-forge` to convert one standalone archive or framework executable. The
 dylib-forge ./AbstractMaps.framework/AbstractMaps \
   --output ./AbstractMaps.framework/AbstractMaps \
   --sdk iphoneos \
-  --install-name @rpath/AbstractMaps.framework/AbstractMaps
+  --install-name @rpath/AbstractMaps.framework/AbstractMaps \
+  --linker-arg -framework --linker-arg UIKit \
+  --ignore-autolink PrivateVendorShim \
+  --exclude-object LegacySimulatorOnly
 ```
 
 | Argument | Required | Meaning |
@@ -49,6 +103,9 @@ dylib-forge ./AbstractMaps.framework/AbstractMaps \
 | `--output <path>` | Yes | Where to write the dynamic binary. |
 | `--sdk <sdk>` | Yes | SDK used for linking, such as `iphoneos`, `iphonesimulator`, `watchos`, or `watchsimulator`. |
 | `--install-name <name>` | Yes | Value written to `LC_ID_DYLIB`, for example `@rpath/Foo.framework/Foo`. |
+| `--linker-arg <arg>` | No | Additional raw argument passed to clang while linking. |
+| `--ignore-autolink <name>` | No | Auto-detected autolink dependency name to ignore. |
+| `--exclude-object <pattern>` | No | Object file name substring to skip while unpacking the archive. |
 
 The command:
 
@@ -58,53 +115,40 @@ The command:
 
 > When the input is a framework executable, this command only converts that executable. It does not copy the framework directory, update a parent XCFramework manifest, remove signatures, or sign the result.
 
-## Optional Relinking Controls
-
-Both commands accept the controls below. Use them when the archive's autolink metadata is incomplete, incorrect, or references dependencies unavailable in the selected SDK.
-
-```text
---linker-arg <arg>            Additional raw argument passed to clang while linking.
---ignore-autolink <name>      Auto-detected autolink dependency name to ignore.
---exclude-object <pattern>    Object file name substring to skip while unpacking the archive.
-```
-
-`--linker-arg` accepts values beginning with `-`:
-
-```bash
---linker-arg -framework --linker-arg UIKit
---linker-arg -lc++
---linker-arg "-Wl,-rpath,@loader_path/Frameworks"
-```
-
-### Resolve Dependencies
+## Resolve Dependencies
 
 You can either defer undefined symbols to the app that loads the dylib, or link each dependency explicitly.
 
-#### Resolve Undefined Symbols at Runtime
+### Resolve Undefined Symbols at Runtime
 
-For a quick attempt at unresolved symbols, pass `--linker-arg "-Wl,-undefined,dynamic_lookup"`:
+For a quick attempt at unresolved symbols, pass `-Wl,-undefined,dynamic_lookup` through a `--linker-arg-sdk any` group:
 
 ```bash
 dylib-forge-xc ./GoogleMaps.xcframework \
   --output ./GoogleMapsDynamic.xcframework \
-  --linker-arg "-Wl,-undefined,dynamic_lookup"
+  --linker-arg-sdk any \
+  --linker-arg-sdk -Wl,-undefined,dynamic_lookup
 ```
 
 This asks the final app to resolve undefined symbols at load time. Apple deprecates `dynamic_lookup`, so explicit linking is preferable when practical.
 
-#### Link Dependencies Explicitly
+### Link Dependencies Explicitly
 
 Instead of `-Wl,-undefined,dynamic_lookup`, pass the frameworks and libraries that the dynamic binary should link.
 
 ```bash
 dylib-forge-xc ./GoogleMaps.xcframework \
   --output ./GoogleMapsDynamic.xcframework \
-  --linker-arg -framework --linker-arg Foundation \
-  --linker-arg -lc++ \
-  --linker-arg -F"Framework/Search/Path" \
-  --linker-arg -Wl,-U,_some_undefined_symbol \
-  --ignore-autolink PrivateVendorShim \
-  --exclude-object LegacySimulatorOnly
+  --linker-arg-sdk any \
+  --linker-arg-sdk -framework \
+  --linker-arg-sdk Foundation \
+  --linker-arg-sdk -lc++ \
+  --linker-arg-sdk -F"Framework/Search/Path" \
+  --linker-arg-sdk -Wl,-U,_some_undefined_symbol \
+  --ignore-autolink-sdk any \
+  --ignore-autolink-sdk PrivateVendorShim \
+  --exclude-object-sdk any \
+  --exclude-object-sdk LegacySimulatorOnly
 ```
 
 ## Architecture Support

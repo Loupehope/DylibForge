@@ -21,8 +21,8 @@ final class XCFrameworkConverter {
 
     /// Produces a fully copied, unsigned XCFramework with every supported static artifact rebuilt.
     func run(inputPath: String, outputPath: String, relinkOptions: RelinkOptions) async throws {
-        let inputURL = URL(fileURLWithPath: inputPath).standardizedFileURL
-        let outputURL = URL(fileURLWithPath: outputPath).standardizedFileURL
+        let inputURL = URL(fileURLWithPath: inputPath).standardizedFileURL.resolvingSymlinksInPath()
+        let outputURL = URL(fileURLWithPath: outputPath).standardizedFileURL.resolvingSymlinksInPath()
         try validateInput(at: inputURL)
 
         let conversionURL = temporaryOutputURL(for: outputURL)
@@ -36,6 +36,9 @@ final class XCFrameworkConverter {
         try removeUnsupportedArtifacts(from: &manifest, in: conversionURL)
         // Mutate one manifest entry at a time so an archive replacement is reflected before serialization.
         for index in manifest.availableLibraries.indices {
+            guard manifest.availableLibraries[index].artifactKind != .other else {
+                continue
+            }
             try await artifactRelinker.relink(
                 &manifest.availableLibraries[index],
                 in: conversionURL,

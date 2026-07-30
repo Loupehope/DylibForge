@@ -24,12 +24,12 @@ final class ArchiveRelinker {
     }
 
     /// Main CLI entry point.
-    func run(inputPath: String, outputPath: String, sdk: String, overrides: RelinkOptions) async throws -> RelinkResult {
-        let inputURL = URL(fileURLWithPath: inputPath).standardizedFileURL
-        let destination = URL(fileURLWithPath: outputPath).standardizedFileURL
+    func run(inputPath: String, outputPath: String, sdk: String, installName: String, overrides: RelinkOptions) async throws -> RelinkResult {
+        let inputURL = URL(fileURLWithPath: inputPath).standardizedFileURL.resolvingSymlinksInPath()
+        let destination = URL(fileURLWithPath: outputPath).standardizedFileURL.resolvingSymlinksInPath()
         let target = try resolveArchive(at: inputURL, sdk: sdk, outputURL: destination)
         let outputBinaryName = target.outputBinaryName
-        let installName = try resolvedInstallName(overrides.installName)
+        let installName = try resolvedInstallName(installName)
 
         return try await relinkArchive(
             target: target,
@@ -144,10 +144,15 @@ private extension ArchiveRelinker {
         let extractedObjects = try archiveExtractor.extractObjectFiles(
             from: thinArchiveURL,
             to: objectsDirectoryURL,
-            excludedObjectNamePatterns: overrides.excludedObjectNamePatterns,
+            excludedObjectNamePatterns: overrides.excludedObjectNamePatterns.values(for: target.sdk, architecture: architecture),
         )
         let detectedAutolinkDirectives = try clangLinker.extractAutolinkDirectives(from: extractedObjects.objectFiles)
-        let finalAutolinkDirectives = clangLinker.mergeAutolinkDirectives(auto: detectedAutolinkDirectives, cli: overrides)
+        let finalAutolinkDirectives = clangLinker.mergeAutolinkDirectives(
+            auto: detectedAutolinkDirectives,
+            cli: overrides,
+            sdk: target.sdk,
+            architecture: architecture,
+        )
 
         let linkContext = try await clangLinker.makeDynamicSliceLinkContext(
             sdk: target.sdk,
@@ -156,7 +161,7 @@ private extension ArchiveRelinker {
             outputFile: dynamicSliceURL,
             installName: installName,
             autolinkDirectives: finalAutolinkDirectives,
-            linkerArgs: overrides.linkerArgs,
+            linkerArgs: overrides.linkerArgs.values(for: target.sdk, architecture: architecture),
         )
 
         // Link the object files into a dynamic slice for this architecture.
@@ -166,12 +171,8 @@ private extension ArchiveRelinker {
     }
 
     /// Validates and normalizes the install name used by the produced dylib.
-    func resolvedInstallName(_ explicitInstallName: String?) throws -> String {
-        guard let explicitInstallName else {
-            throw DylibForgeError.message("Missing required --install-name. For a framework binary use something like @rpath/Foo.framework/Foo")
-        }
-
-        let trimmedInstallName = explicitInstallName.trimmingCharacters(in: .whitespacesAndNewlines)
+    func resolvedInstallName(_ installName: String) throws -> String {
+        let trimmedInstallName = installName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedInstallName.isEmpty else {
             throw DylibForgeError.message("Install name cannot be empty")
         }

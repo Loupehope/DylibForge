@@ -9,6 +9,7 @@ struct DylibForgeXCFrameworkCLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "dylib-forge-xc",
         abstract: "Convert static XCFramework artifacts into dynamic libraries.",
+        version: "1.5.0",
     )
 
     @Argument(help: "Path to the input XCFramework.")
@@ -17,14 +18,17 @@ struct DylibForgeXCFrameworkCLI: AsyncParsableCommand {
     @Option(help: "Output path for the generated XCFramework. Input may be reused for in-place conversion.")
     var output: String
 
-    @Option(parsing: .unconditionalSingleValue, help: "Additional raw argument passed to clang while linking.")
-    var linkerArg: [String] = []
+    @Option(parsing: .unconditionalSingleValue, help: "SDK name or any followed by raw linker arguments.")
+    var linkerArgSDK: [String] = []
 
-    @Option(help: "Auto-detected autolink dependency name to ignore.")
-    var ignoreAutolink: [String] = []
+    @Option(parsing: .unconditionalSingleValue, help: "SDK name or any followed by autolink dependency names to ignore.")
+    var ignoreAutolinkSDK: [String] = []
 
-    @Option(help: "Object file name substring to skip while unpacking static archives.")
-    var excludeObject: [String] = []
+    @Option(parsing: .unconditionalSingleValue, help: "SDK name or any followed by object file name substrings to skip.")
+    var excludeObjectSDK: [String] = []
+
+    @Option(help: "XCFramework dependency. Its matching platform and architecture slice is linked automatically.")
+    var xcframeworkDependency: [String] = []
 
     func run() async throws {
         LoggingSystem.bootstrap { ColoredLogHandler.standardError(label: $0) }
@@ -32,11 +36,12 @@ struct DylibForgeXCFrameworkCLI: AsyncParsableCommand {
         try await DylibForgeXCFramework.run(
             inputPath: input,
             outputPath: output,
-            relinkOptions: RelinkOptions(
-                linkerArgs: linkerArg,
-                ignoredAutolinkDependencies: ignoreAutolink,
-                excludedObjectNamePatterns: excludeObject,
+            sdkArguments: XCFrameworkSDKArguments(
+                linkerArgs: linkerArgSDK,
+                ignoredAutolinkDependencies: ignoreAutolinkSDK,
+                excludedObjectNamePatterns: excludeObjectSDK,
             ),
+            xcframeworkDependencies: xcframeworkDependency,
         )
     }
 }

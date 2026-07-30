@@ -69,7 +69,9 @@ final class XCFrameworkFiles {
     /// The input signature cannot remain valid after a binary is replaced, so the output is deliberately unsigned.
     func removeCodeSignatures(from root: URL, libraries: [XCFrameworkLibrary]) throws {
         try removeCodeSignatureDirectories(from: root)
-        libraries.forEach { removeBinaryCodeSignature(from: $0.artifactURL(in: root)) }
+        for library in libraries {
+            try removeBinaryCodeSignature(from: library.artifactURL(in: root))
+        }
     }
 }
 

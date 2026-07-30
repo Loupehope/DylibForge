@@ -59,8 +59,8 @@ struct DynamicSliceLinkContext {
 }
 
 /// System command output.
-struct CommandResult {
-    let stdout: String
+public struct CommandResult: Sendable {
+    public let stdout: String
 }
 
 /// Partial `swiftc -print-target-info` output used to discover Swift runtime search paths.
@@ -112,22 +112,49 @@ struct SDKTargetTriples {
     let tbd: String
 }
 
+/// Values shared by every relinking operation together with SDK- and architecture-specific values.
+public struct ScopedValues: Sendable {
+    /// Values applied to every SDK.
+    public let base: [String]
+    /// Values added only when relinking a slice built with the dictionary key's SDK.
+    public let sdkSpecific: [String: [String]]
+    /// Values added only when relinking the dictionary key's architecture.
+    public let architectureSpecific: [String: [String]]
+
+    /// Creates values that can be shared by all slices or restricted to individual SDKs and architectures.
+    public init(
+        base: [String] = [],
+        sdkSpecific: [String: [String]] = [:],
+        architectureSpecific: [String: [String]] = [:],
+    ) {
+        self.base = base
+        self.sdkSpecific = sdkSpecific
+        self.architectureSpecific = architectureSpecific
+    }
+
+    /// Returns the shared and SDK-specific values followed by the values configured for `architecture`.
+    public func values(for sdk: String, architecture: String) -> [String] {
+        base + sdkSpecific[sdk, default: []] + architectureSpecific[architecture, default: []]
+    }
+}
+
 /// Linking options received from the CLI.
 public struct RelinkOptions: Sendable {
-    public let linkerArgs: [String]
-    public let ignoredAutolinkDependencies: [String]
-    public let installName: String?
-    public let excludedObjectNamePatterns: [String]
+    /// Raw linker arguments.
+    public let linkerArgs: ScopedValues
+    /// Auto-linked dependency names to ignore.
+    public let ignoredAutolinkDependencies: ScopedValues
+    /// Archive object name patterns to exclude before linking.
+    public let excludedObjectNamePatterns: ScopedValues
 
+    /// Creates relinking options.
     public init(
-        linkerArgs: [String],
-        ignoredAutolinkDependencies: [String] = [],
-        installName: String? = nil,
-        excludedObjectNamePatterns: [String] = [],
+        linkerArgs: ScopedValues = ScopedValues(),
+        ignoredAutolinkDependencies: ScopedValues = ScopedValues(),
+        excludedObjectNamePatterns: ScopedValues = ScopedValues(),
     ) {
         self.linkerArgs = linkerArgs
         self.ignoredAutolinkDependencies = ignoredAutolinkDependencies
-        self.installName = installName
         self.excludedObjectNamePatterns = excludedObjectNamePatterns
     }
 }

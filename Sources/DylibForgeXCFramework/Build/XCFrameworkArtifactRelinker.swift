@@ -1,46 +1,59 @@
 import DylibForgeCore
 import Foundation
-import Logging
 
 /// Rebuilds one XCFramework artifact using the core archive relinker.
 final class XCFrameworkArtifactRelinker {
-    private let logger: Logger
     private let files: XCFrameworkFiles
     private let dylibForge: DylibForge.Type
+    private let dependencyResolver: XCFrameworkDependencyResolver
+    private let sdkNameResolver: XCFrameworkSDKNameResolver
 
     /// Wires artifact rebuilding around shared file access and the core relinker entry point.
     init(
         files: XCFrameworkFiles,
         dylibForge: DylibForge.Type,
-        logger: Logger = Logger(label: "dylib-forge.xcframework"),
+        dependencyResolver: XCFrameworkDependencyResolver,
+        sdkNameResolver: XCFrameworkSDKNameResolver,
     ) {
         self.files = files
         self.dylibForge = dylibForge
-        self.logger = logger
+        self.dependencyResolver = dependencyResolver
+        self.sdkNameResolver = sdkNameResolver
     }
 
-    /// Rebuilds one static archive or framework entry, leaving unsupported artifact forms untouched.
+    /// Rebuilds one static archive or framework entry.
     func relink(
         _ library: inout XCFrameworkLibrary,
         in xcframeworkURL: URL,
         relinkOptions: RelinkOptions,
     ) async throws {
-        let artifactURL = library.artifactURL(in: xcframeworkURL)
+        let artifactURL = try library.artifactURL(in: xcframeworkURL)
+        let dependencyArgs = try dependencyResolver.linkerArgs(for: library)
+        let options = RelinkOptions(
+            linkerArgs: ScopedValues(
+                base: relinkOptions.linkerArgs.base,
+                sdkSpecific: relinkOptions.linkerArgs.sdkSpecific,
+                architectureSpecific: relinkOptions.linkerArgs.architectureSpecific.merging(dependencyArgs) { $0 + $1 },
+            ),
+            ignoredAutolinkDependencies: relinkOptions.ignoredAutolinkDependencies,
+            excludedObjectNamePatterns: relinkOptions.excludedObjectNamePatterns,
+        )
+
         switch library.artifactKind {
         case .staticArchive:
             try await relinkArchive(
                 at: artifactURL,
                 library: &library,
-                relinkOptions: relinkOptions,
+                relinkOptions: options,
             )
         case .framework:
             try await relinkFramework(
                 at: artifactURL,
                 library: &library,
-                relinkOptions: relinkOptions,
+                relinkOptions: options,
             )
         case .other:
-            logger.info("Keeping non-static artifact unchanged: \(artifactURL.path)")
+            return
         }
     }
 }
@@ -58,15 +71,13 @@ private extension XCFrameworkArtifactRelinker {
 
         let dylibURL = archiveURL.deletingPathExtension().appendingPathExtension("dylib")
 
+        let targetSDK = try sdkNameResolver.sdk(for: library)
         let result = try await dylibForge.run(
             inputPath: archiveURL.path,
             outputPath: dylibURL.path,
-            sdk: sdk(for: library),
-            relinkOptions: resolvedRelinkOptions(
-                from: relinkOptions,
-                installName: "@rpath/\(dylibURL.lastPathComponent)",
-                library: library,
-            ),
+            sdk: targetSDK,
+            installName: "@rpath/\(dylibURL.lastPathComponent)",
+            relinkOptions: relinkOptions,
         )
         // The copied archive is no longer referenced after the manifest points to the new dylib.
         try files.removeItem(at: archiveURL)
@@ -81,67 +92,18 @@ private extension XCFrameworkArtifactRelinker {
         relinkOptions: RelinkOptions,
     ) async throws {
         let bundleInfo = try files.readBundleInfo(at: frameworkURL)
-        let binaryURL = frameworkURL.appendingPathComponent(bundleInfo.executableName)
+        let binaryURL = frameworkURL
+            .appendingPathComponent(bundleInfo.executableName)
+            .resolvingSymlinksInPath()
 
+        let targetSDK = try sdkNameResolver.sdk(for: library, bundleInfo: bundleInfo)
         let result = try await dylibForge.run(
             inputPath: binaryURL.path,
             outputPath: binaryURL.path,
-            sdk: sdk(for: library, bundleInfo: bundleInfo),
-            relinkOptions: resolvedRelinkOptions(
-                from: relinkOptions,
-                installName: "@rpath/\(frameworkURL.lastPathComponent)/\(bundleInfo.executableName)",
-                library: library,
-            ),
+            sdk: targetSDK,
+            installName: "@rpath/\(frameworkURL.lastPathComponent)/\(bundleInfo.executableName)",
+            relinkOptions: relinkOptions,
         )
         library.replaceSupportedArchitectures(with: result.linkedArchitectures)
-    }
-
-    /// Retains user-provided linker controls while supplying metadata that must be artifact-specific.
-    func resolvedRelinkOptions(
-        from baseOptions: RelinkOptions,
-        installName: String,
-        library _: XCFrameworkLibrary,
-    ) -> RelinkOptions {
-        RelinkOptions(
-            linkerArgs: baseOptions.linkerArgs,
-            ignoredAutolinkDependencies: baseOptions.ignoredAutolinkDependencies,
-            installName: installName,
-            excludedObjectNamePatterns: baseOptions.excludedObjectNamePatterns,
-        )
-    }
-
-    /// Selects the SDK for an artifact, preferring a framework bundle's explicit Xcode platform name.
-    func sdk(for library: XCFrameworkLibrary, bundleInfo: XCFrameworkBundleInfo? = nil) throws -> String {
-        if let platformName = bundleInfo?.platformName, !platformName.isEmpty {
-            return platformName
-        }
-
-        guard let platform = library.supportedPlatform else {
-            throw XCFrameworkError.message("AvailableLibraries item has no SupportedPlatform")
-        }
-
-        switch (platform, library.supportedPlatformVariant) {
-        case ("ios", "simulator"):
-            return "iphonesimulator"
-        case ("ios", _):
-            return "iphoneos"
-        case ("tvos", "simulator"):
-            return "appletvsimulator"
-        case ("tvos", _):
-            return "appletvos"
-        case ("watchos", "simulator"):
-            return "watchsimulator"
-        case ("watchos", _):
-            return "watchos"
-        case ("xros", "simulator"), ("visionos", "simulator"):
-            return "xrsimulator"
-        case ("xros", _), ("visionos", _):
-            return "xros"
-        case ("macos", _):
-            return "macosx"
-        default:
-            let variant = library.supportedPlatformVariant.map { " (\($0))" } ?? ""
-            throw XCFrameworkError.message("Unsupported XCFramework platform: \(platform)\(variant)")
-        }
     }
 }

@@ -2,18 +2,18 @@ import Foundation
 import Logging
 import Subprocess
 
-final class CommandExecutor {
+public final class CommandExecutor {
     private let logger: Logger
 
-    init(logger: Logger = Logger(label: "dylib-forge.command")) {
+    public init(logger: Logger = Logger(label: "dylib-forge.command")) {
         self.logger = logger
     }
 
-    func run(_ arguments: String...) async throws -> CommandResult {
+    public func run(_ arguments: String...) async throws -> CommandResult {
         try await run(arguments: arguments)
     }
 
-    func run(arguments: [String]) async throws -> CommandResult {
+    public func run(arguments: [String]) async throws -> CommandResult {
         guard let executable = arguments.first else {
             throw DylibForgeError.message("Shell command is empty")
         }

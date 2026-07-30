@@ -30,7 +30,7 @@ final class ProjectFiles {
     }
 
     func copyItem(at source: URL, to destination: URL) throws {
-        if source.standardizedFileURL == destination.standardizedFileURL {
+        if source.standardizedFileURL.resolvingSymlinksInPath() == destination.standardizedFileURL.resolvingSymlinksInPath() {
             return
         }
 
