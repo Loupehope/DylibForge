@@ -123,7 +123,7 @@ final class ClangLinker {
             return true
         } catch {
             logger.warning("""
-            Skipping `\(architecture)` for `\(sdk)`: the selected Xcode cannot build this architecture. 
+            Skipping `\(architecture)` for `\(sdk)`: the selected Xcode cannot build this architecture.
             Its version or SDK support may be too new or too old:
             \(error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines))
             """)

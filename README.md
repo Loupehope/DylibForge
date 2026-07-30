@@ -9,13 +9,15 @@ DylibForge converts static Apple `ar` archives into dynamic Mach-O libraries. It
 
 Download the latest binaries from [GitHub Releases](https://github.com/Loupehope/DylibForge/releases/latest).
 
+> DylibForge mechanically transforms supplied binary artifacts for relinking and, for XCFramework inputs, repackaging. It parses binary formats and linker metadata only as required for those transformations. It does not decompile binaries, reconstruct source code, or attempt to infer, evaluate, or model a program's logic, behavior, purpose, or functionality.
+
 ## Convert an XCFramework
 
 Use `dylib-forge-xc` to convert a complete XCFramework. The output path may be the same as the input path.
 
 ```bash
-dylib-forge-xc ./GoogleMaps.xcframework \
-  --output ./GoogleMapsDynamic.xcframework
+dylib-forge-xc ./Library.xcframework \
+  --output ./LibraryDynamic.xcframework
 ```
 
 | Argument | Required | Meaning |
@@ -64,7 +66,7 @@ Use `--xcframework-dependency` when the dependency is itself an XCFramework. Dyl
 ```bash
 dylib-forge-xc ./Library.xcframework \
   --output ./LibraryDynamic.xcframework \
-  --xcframework-dependency ./VendorSDK.xcframework
+  --xcframework-dependency ./Dependency.xcframework
 ```
 
 The same dependency can also be specified explicitly with `--linker-arg-sdk`:
@@ -73,14 +75,14 @@ The same dependency can also be specified explicitly with `--linker-arg-sdk`:
 dylib-forge-xc ./Library.xcframework --output ./LibraryDynamic.xcframework \
   --linker-arg-sdk iphoneos \
   --linker-arg-sdk -F \
-  --linker-arg-sdk ./VendorSDK.xcframework/ios-arm64 \
+  --linker-arg-sdk ./Dependency.xcframework/ios-arm64 \
   --linker-arg-sdk -framework \
-  --linker-arg-sdk VendorSDK \
+  --linker-arg-sdk Dependency \
   --linker-arg-sdk iphonesimulator \
   --linker-arg-sdk -F \
-  --linker-arg-sdk ./VendorSDK.xcframework/ios-arm64_x86_64-simulator \
+  --linker-arg-sdk ./Dependency.xcframework/ios-arm64_x86_64-simulator \
   --linker-arg-sdk -framework \
-  --linker-arg-sdk VendorSDK
+  --linker-arg-sdk Dependency
 ```
 
 ## Convert One Archive or Framework Binary
@@ -88,12 +90,12 @@ dylib-forge-xc ./Library.xcframework --output ./LibraryDynamic.xcframework \
 Use `dylib-forge` to convert one standalone archive or framework executable. The output path may be the same as the input path.
 
 ```bash
-dylib-forge ./AbstractMaps.framework/AbstractMaps \
-  --output ./AbstractMaps.framework/AbstractMaps \
+dylib-forge ./Library.framework/Library \
+  --output ./Library.framework/Library \
   --sdk iphoneos \
-  --install-name @rpath/AbstractMaps.framework/AbstractMaps \
+  --install-name @rpath/Library.framework/Library \
   --linker-arg -framework --linker-arg UIKit \
-  --ignore-autolink PrivateVendorShim \
+  --ignore-autolink PrivateShim \
   --exclude-object LegacySimulatorOnly
 ```
 
@@ -124,8 +126,8 @@ You can either defer undefined symbols to the app that loads the dylib, or link 
 For a quick attempt at unresolved symbols, pass `-Wl,-undefined,dynamic_lookup` through a `--linker-arg-sdk any` group:
 
 ```bash
-dylib-forge-xc ./GoogleMaps.xcframework \
-  --output ./GoogleMapsDynamic.xcframework \
+dylib-forge-xc ./Library.xcframework \
+  --output ./LibraryDynamic.xcframework \
   --linker-arg-sdk any \
   --linker-arg-sdk -Wl,-undefined,dynamic_lookup
 ```
@@ -137,8 +139,8 @@ This asks the final app to resolve undefined symbols at load time. Apple depreca
 Instead of `-Wl,-undefined,dynamic_lookup`, pass the frameworks and libraries that the dynamic binary should link.
 
 ```bash
-dylib-forge-xc ./GoogleMaps.xcframework \
-  --output ./GoogleMapsDynamic.xcframework \
+dylib-forge-xc ./Library.xcframework \
+  --output ./LibraryDynamic.xcframework \
   --linker-arg-sdk any \
   --linker-arg-sdk -framework \
   --linker-arg-sdk Foundation \
@@ -146,7 +148,7 @@ dylib-forge-xc ./GoogleMaps.xcframework \
   --linker-arg-sdk -F"Framework/Search/Path" \
   --linker-arg-sdk -Wl,-U,_some_undefined_symbol \
   --ignore-autolink-sdk any \
-  --ignore-autolink-sdk PrivateVendorShim \
+  --ignore-autolink-sdk PrivateShim \
   --exclude-object-sdk any \
   --exclude-object-sdk LegacySimulatorOnly
 ```

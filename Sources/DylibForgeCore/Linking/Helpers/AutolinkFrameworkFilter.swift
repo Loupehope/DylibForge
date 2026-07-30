@@ -102,7 +102,7 @@ private extension AutolinkFrameworkFilter {
 
     /// Builds candidate `.tbd` locations for a framework name.
     ///
-    /// Explicit `-F` search paths are included before the SDK root in `context.frameworkSearchRoots`, so vendored
+    /// Explicit `-F` search paths are included before the SDK root in `context.frameworkSearchRoots`, so supplied
     /// SDK overlays can take precedence over platform SDK stubs. Inside each root, the lookup probes the public
     /// and private framework directories used by Apple SDKs.
     func frameworkStubURLs(forFramework framework: String, context: DynamicSliceLinkContext) -> [URL] {
