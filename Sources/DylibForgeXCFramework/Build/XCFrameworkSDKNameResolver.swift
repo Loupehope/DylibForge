@@ -7,7 +7,7 @@ final class XCFrameworkSDKNameResolver {
     private let jsonDecoder: JSONDecoder
 
     init(
-        commandExecutor: CommandExecutor = CommandExecutor(),
+        commandExecutor: CommandExecutor,
         jsonDecoder: JSONDecoder = JSONDecoder(),
     ) {
         self.commandExecutor = commandExecutor

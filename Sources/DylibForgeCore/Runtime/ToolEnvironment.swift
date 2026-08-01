@@ -4,7 +4,7 @@ final class ToolEnvironment {
     let files: ProjectFiles
     let shell: CommandExecutor
 
-    init(files: ProjectFiles = ProjectFiles(), shell: CommandExecutor = CommandExecutor()) {
+    init(files: ProjectFiles = ProjectFiles(), shell: CommandExecutor) {
         self.files = files
         self.shell = shell
     }

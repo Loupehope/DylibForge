@@ -24,6 +24,7 @@ dylib-forge-xc ./Library.xcframework \
 | --- | --- | --- |
 | `<input>` | Yes | Source `.xcframework` path. |
 | `--output <path>` | Yes | Converted `.xcframework` path. |
+| `--xcode-path <path>` | No | Xcode `.app` bundle to use. Defaults to `xcode-select`. |
 | `--linker-arg-sdk <sdk-or-arg>` | No | SDK name or `any` followed by raw linker arguments. |
 | `--ignore-autolink-sdk <sdk-or-name>` | No | SDK name or `any` followed by autolink dependency names to ignore. |
 | `--exclude-object-sdk <sdk-or-pattern>` | No | SDK name or `any` followed by archive object name patterns to exclude. |
@@ -105,6 +106,7 @@ dylib-forge ./Library.framework/Library \
 | `--output <path>` | Yes | Where to write the dynamic binary. |
 | `--sdk <sdk>` | Yes | SDK used for linking, such as `iphoneos`, `iphonesimulator`, `watchos`, or `watchsimulator`. |
 | `--install-name <name>` | Yes | Value written to `LC_ID_DYLIB`, for example `@rpath/Foo.framework/Foo`. |
+| `--xcode-path <path>` | No | Xcode `.app` bundle to use. Defaults to `xcode-select`. |
 | `--linker-arg <arg>` | No | Additional raw argument passed to clang while linking. |
 | `--ignore-autolink <name>` | No | Auto-detected autolink dependency name to ignore. |
 | `--exclude-object <pattern>` | No | Object file name substring to skip while unpacking the archive. |
@@ -155,7 +157,9 @@ dylib-forge-xc ./Library.xcframework \
 
 ## Architecture Support
 
-Both tools handle input archives and framework binaries that contain several architecture slices. Before relinking a static slice, DylibForge asks the currently selected Xcode (`xcode-select`) whether its SDK and toolchain support that target. If they do not, the tool logs a warning and continues with the remaining supported architectures.
+Both tools handle input archives and framework binaries that contain several architecture slices. Before relinking a static slice, DylibForge asks the selected Xcode whether its SDK and toolchain support that target.
+
+> Pass `--xcode-path /Applications/Xcode.app` to select Xcode for that command only. Otherwise the Xcode selected by `xcode-select` is used. If it does not support a target, the tool logs a warning and continues with the remaining supported architectures.
 
 If an architecture is skipped during `dylib-forge-xc`, the output root `Info.plist` is updated. Its `AvailableLibraries` entry receives the actual `SupportedArchitectures`, and a converted archive receives its new `.dylib` `LibraryPath`. The library identifier and directory stay the same, so every manifest path continues to resolve.
 

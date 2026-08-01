@@ -18,6 +18,9 @@ struct DylibForgeXCFrameworkCLI: AsyncParsableCommand {
     @Option(help: "Output path for the generated XCFramework. Input may be reused for in-place conversion.")
     var output: String
 
+    @Option(help: "Path to an Xcode.app bundle. Defaults to the Xcode selected by xcode-select.")
+    var xcodePath: String?
+
     @Option(parsing: .unconditionalSingleValue, help: "SDK name or any followed by raw linker arguments.")
     var linkerArgSDK: [String] = []
 
@@ -42,6 +45,7 @@ struct DylibForgeXCFrameworkCLI: AsyncParsableCommand {
                 excludedObjectNamePatterns: excludeObjectSDK,
             ),
             xcframeworkDependencies: xcframeworkDependency,
+            xcodePath: xcodePath,
         )
     }
 }

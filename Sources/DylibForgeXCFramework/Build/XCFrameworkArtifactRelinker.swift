@@ -7,6 +7,7 @@ final class XCFrameworkArtifactRelinker {
     private let dylibForge: DylibForge.Type
     private let dependencyResolver: XCFrameworkDependencyResolver
     private let sdkNameResolver: XCFrameworkSDKNameResolver
+    private let xcodePath: String?
 
     /// Wires artifact rebuilding around shared file access and the core relinker entry point.
     init(
@@ -14,11 +15,13 @@ final class XCFrameworkArtifactRelinker {
         dylibForge: DylibForge.Type,
         dependencyResolver: XCFrameworkDependencyResolver,
         sdkNameResolver: XCFrameworkSDKNameResolver,
+        xcodePath: String?,
     ) {
         self.files = files
         self.dylibForge = dylibForge
         self.dependencyResolver = dependencyResolver
         self.sdkNameResolver = sdkNameResolver
+        self.xcodePath = xcodePath
     }
 
     /// Rebuilds one static archive or framework entry.
@@ -78,6 +81,7 @@ private extension XCFrameworkArtifactRelinker {
             sdk: targetSDK,
             installName: "@rpath/\(dylibURL.lastPathComponent)",
             relinkOptions: relinkOptions,
+            xcodePath: xcodePath,
         )
         // The copied archive is no longer referenced after the manifest points to the new dylib.
         try files.removeItem(at: archiveURL)
@@ -103,6 +107,7 @@ private extension XCFrameworkArtifactRelinker {
             sdk: targetSDK,
             installName: "@rpath/\(frameworkURL.lastPathComponent)/\(bundleInfo.executableName)",
             relinkOptions: relinkOptions,
+            xcodePath: xcodePath,
         )
         library.replaceSupportedArchitectures(with: result.linkedArchitectures)
     }

@@ -2,18 +2,68 @@ import Foundation
 import Logging
 import Subprocess
 
-public final class CommandExecutor {
+/// Runs an external command and returns its standard output.
+public protocol CommandExecutor: AnyObject {
+    /// Runs a command represented by its executable followed by arguments.
+    func run(arguments: [String]) async throws -> CommandResult
+}
+
+public extension CommandExecutor {
+    /// Runs a command represented by a variadic executable-and-arguments list.
+    func run(_ arguments: String...) async throws -> CommandResult {
+        try await run(arguments: arguments)
+    }
+}
+
+/// Runs commands using the current process environment.
+public final class DefaultCommandExecutor: CommandExecutor {
+    private let executor: CommandExecutorImpl
+
+    /// Creates an executor that inherits the current process environment.
+    public init(logger: Logger = Logger(label: "dylib-forge.command")) {
+        executor = CommandExecutorImpl(
+            developerDirectory: nil,
+            logger: logger,
+        )
+    }
+
+    /// Runs a command represented by its executable followed by arguments.
+    public func run(arguments: [String]) async throws -> CommandResult {
+        try await executor.run(arguments: arguments)
+    }
+}
+
+/// Runs commands using one explicit Xcode developer directory.
+public final class DeveloperCommandExecutor: CommandExecutor {
+    private let executor: CommandExecutorImpl
+
+    /// Creates an executor that sets `DEVELOPER_DIR` for every command it runs.
+    public init(
+        developerDirectory: String,
+        logger: Logger = Logger(label: "dylib-forge.command"),
+    ) {
+        executor = CommandExecutorImpl(
+            developerDirectory: developerDirectory,
+            logger: logger,
+        )
+    }
+
+    /// Runs a command represented by its executable followed by arguments.
+    public func run(arguments: [String]) async throws -> CommandResult {
+        try await executor.run(arguments: arguments)
+    }
+}
+
+private final class CommandExecutorImpl {
+    private let developerDirectory: String?
     private let logger: Logger
 
-    public init(logger: Logger = Logger(label: "dylib-forge.command")) {
+    init(developerDirectory: String?, logger: Logger) {
+        self.developerDirectory = developerDirectory
         self.logger = logger
     }
 
-    public func run(_ arguments: String...) async throws -> CommandResult {
-        try await run(arguments: arguments)
-    }
-
-    public func run(arguments: [String]) async throws -> CommandResult {
+    func run(arguments: [String]) async throws -> CommandResult {
         guard let executable = arguments.first else {
             throw DylibForgeError.message("Shell command is empty")
         }
@@ -21,6 +71,7 @@ public final class CommandExecutor {
         let result = try await Subprocess.run(
             .name(executable),
             arguments: Arguments(Array(arguments.dropFirst())),
+            environment: subprocessEnvironment,
             output: .string(limit: .max),
             error: .string(limit: .max),
         )
@@ -48,21 +99,12 @@ public final class CommandExecutor {
     }
 }
 
-private extension CommandExecutor {
-    func displayCommand(_ arguments: [String]) -> String {
-        arguments.map(quoteForDisplay).joined(separator: " ")
-    }
-
-    func quoteForDisplay(_ argument: String) -> String {
-        guard !argument.isEmpty,
-              argument.rangeOfCharacter(from: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "\"'\\"))) == nil
-        else {
-            let escaped = argument
-                .replacingOccurrences(of: "\\", with: "\\\\")
-                .replacingOccurrences(of: "\"", with: "\\\"")
-            return "\"\(escaped)\""
+private extension CommandExecutorImpl {
+    var subprocessEnvironment: Environment {
+        guard let developerDirectory else {
+            return .inherit
         }
 
-        return argument
+        return .inherit.updating(["DEVELOPER_DIR": developerDirectory])
     }
 }

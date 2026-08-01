@@ -39,11 +39,15 @@ public enum DylibForgeXCFramework {
         outputPath: String,
         sdkArguments: XCFrameworkSDKArguments = XCFrameworkSDKArguments(),
         xcframeworkDependencies: [String],
+        xcodePath: String? = nil,
     ) async throws {
         // Keep file access shared by the converter and artifact relinker, mirroring the core tool environment.
         let files = XCFrameworkFiles()
         let dependencyResolver = try XCFrameworkDependencyResolver(paths: xcframeworkDependencies, files: files)
-        let sdkNameResolver = XCFrameworkSDKNameResolver()
+        let developerDirectory = try await XcodePathProvider().developerDirectory(for: xcodePath)
+        let sdkNameResolver = XCFrameworkSDKNameResolver(
+            commandExecutor: DeveloperCommandExecutor(developerDirectory: developerDirectory),
+        )
         let sdkOptions = try await sdkNameResolver.options(
             linkerArgs: sdkArguments.linkerArgs,
             ignoredAutolinkDependencies: sdkArguments.ignoredAutolinkDependencies,
@@ -54,6 +58,7 @@ public enum DylibForgeXCFramework {
             dylibForge: DylibForge.self,
             dependencyResolver: dependencyResolver,
             sdkNameResolver: sdkNameResolver,
+            xcodePath: xcodePath,
         )
         let converter = XCFrameworkConverter(
             files: files,

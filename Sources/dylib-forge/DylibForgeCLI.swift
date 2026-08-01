@@ -23,6 +23,9 @@ struct DylibForgeCLI: AsyncParsableCommand {
     @Option(help: "Install name written into LC_ID_DYLIB, for example @rpath/Foo.framework/Foo.")
     var installName: String
 
+    @Option(help: "Path to an Xcode.app bundle. Defaults to the Xcode selected by xcode-select.")
+    var xcodePath: String?
+
     @Option(parsing: .unconditionalSingleValue, help: "Additional raw argument passed to clang while linking.")
     var linkerArg: [String] = []
 
@@ -45,6 +48,7 @@ struct DylibForgeCLI: AsyncParsableCommand {
                 ignoredAutolinkDependencies: ScopedValues(base: ignoreAutolink),
                 excludedObjectNamePatterns: ScopedValues(base: excludeObject),
             ),
+            xcodePath: xcodePath,
         )
     }
 }

@@ -215,10 +215,19 @@ private extension AutolinkFrameworkFilter {
     func filteredClients(from allowableClients: [TBDAllowableClients], target: String) -> Set<String> {
         Set(
             allowableClients
-                .filter { entry in entry.targets?.contains(target) ?? true }
+                .filter { entry in entry.targets?.contains(where: { targetMatches($0, linkedSliceTarget: target) }) ?? true }
                 .flatMap(\.clients)
                 .filter { $0 != "-allowable_client" },
         )
+    }
+
+    /// Matches a requested TAPI target, treating an `arm64e` SDK entry as applicable to the matching `arm64` slice.
+    func targetMatches(_ stubTarget: String, linkedSliceTarget: String) -> Bool {
+        if stubTarget == linkedSliceTarget {
+            return true
+        }
+
+        return stubTarget == "arm64e-\(linkedSliceTarget.dropFirst("arm64-".count))"
     }
 
     /// Decodes TAPI v5 JSON. Newer JSON versions deliberately reuse this model until their schema changes.
@@ -246,10 +255,10 @@ private extension AutolinkFrameworkFilter {
 
     /// Removes documents that are explicitly declared as re-exports of another document in the same TAPI stream.
     func directYAMLMetadata(in stub: String, target: String) -> [TBDYAMLMetadata] {
-        let metadata = yamlMetadata(in: stub).filter { $0.targets?.contains(target) ?? true }
+        let metadata = yamlMetadata(in: stub).filter { $0.targets?.contains(where: { targetMatches($0, linkedSliceTarget: target) }) ?? true }
         let reexportedLibraries = Set(metadata.flatMap { document in
             document.reexportedLibraries?
-                .filter { $0.targets?.contains(target) ?? true }
+                .filter { $0.targets?.contains(where: { targetMatches($0, linkedSliceTarget: target) }) ?? true }
                 .flatMap(\.libraries) ?? []
         })
         return metadata.filter { !reexportedLibraries.contains($0.installName) }

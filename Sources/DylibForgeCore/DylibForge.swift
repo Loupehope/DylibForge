@@ -8,8 +8,12 @@ public enum DylibForge {
         sdk: String,
         installName: String,
         relinkOptions: RelinkOptions,
+        xcodePath: String? = nil,
     ) async throws -> RelinkResult {
-        let environment = ToolEnvironment()
+        let developerDirectory = try await XcodePathProvider().developerDirectory(for: xcodePath)
+        let environment = ToolEnvironment(
+            shell: DeveloperCommandExecutor(developerDirectory: developerDirectory),
+        )
         let machoEditor = MachOEditor()
         let archiveExtractor = ArchiveExtractor(
             environment: environment,
