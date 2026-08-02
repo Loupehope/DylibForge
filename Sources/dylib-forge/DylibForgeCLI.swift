@@ -1,5 +1,6 @@
 import ArgumentParser
 import DylibForgeCore
+import DylibForgeSubprocess
 import Foundation
 import Logging
 

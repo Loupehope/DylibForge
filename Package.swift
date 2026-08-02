@@ -10,11 +10,15 @@ let package = Package(
     products: [
         .executable(
             name: "dylib-forge",
-            targets: ["dylib-forge"]
+            targets: ["dylib-forge"],
         ),
         .executable(
             name: "dylib-forge-xc",
-            targets: ["dylib-forge-xc"]
+            targets: ["dylib-forge-xc"],
+        ),
+        .executable(
+            name: "dylib-forge-tests",
+            targets: ["dylib-forge-tests"],
         ),
     ],
     dependencies: [
@@ -26,36 +30,63 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "DylibForgeCore",
+            name: "DylibForgeSubprocess",
             dependencies: [
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Subprocess", package: "swift-subprocess"),
+            ],
+        ),
+        .target(
+            name: "DylibForgeCore",
+            dependencies: [
+                "DylibForgeSubprocess",
+                .product(name: "Logging", package: "swift-log"),
                 .product(name: "Yams", package: "Yams"),
-            ]
+            ],
         ),
         .executableTarget(
             name: "dylib-forge",
             dependencies: [
                 "DylibForgeCore",
+                "DylibForgeSubprocess",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "Logging", package: "swift-log"),
-            ]
+            ],
         ),
         .target(
             name: "DylibForgeXCFramework",
             dependencies: [
                 "DylibForgeCore",
+                "DylibForgeSubprocess",
                 .product(name: "Logging", package: "swift-log"),
-            ]
+            ],
         ),
         .executableTarget(
             name: "dylib-forge-xc",
             dependencies: [
                 "DylibForgeXCFramework",
                 "DylibForgeCore",
+                "DylibForgeSubprocess",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "Logging", package: "swift-log"),
-            ]
+            ],
         ),
-    ]
+        .target(
+            name: "DylibForgeAcceptanceTests",
+            dependencies: [
+                "DylibForgeSubprocess",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "Logging", package: "swift-log"),
+            ],
+        ),
+        .executableTarget(
+            name: "dylib-forge-tests",
+            dependencies: [
+                "DylibForgeAcceptanceTests",
+                "DylibForgeSubprocess",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "Logging", package: "swift-log"),
+            ],
+        ),
+    ],
 )

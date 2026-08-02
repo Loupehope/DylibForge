@@ -1,4 +1,5 @@
 import CryptoKit
+import DylibForgeSubprocess
 import Foundation
 
 /// Reads a Unix `ar` archive and converts its members into convenient objects.

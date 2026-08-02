@@ -1,3 +1,4 @@
+import DylibForgeSubprocess
 import Foundation
 
 final class ToolEnvironment {

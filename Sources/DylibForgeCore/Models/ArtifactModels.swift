@@ -58,11 +58,6 @@ struct DynamicSliceLinkContext {
     }
 }
 
-/// System command output.
-public struct CommandResult: Sendable {
-    public let stdout: String
-}
-
 /// Partial `swiftc -print-target-info` output used to discover Swift runtime search paths.
 struct SwiftTargetInfo: Decodable {
     let paths: SwiftTargetPaths

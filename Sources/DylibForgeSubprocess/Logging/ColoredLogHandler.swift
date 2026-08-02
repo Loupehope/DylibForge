@@ -52,15 +52,19 @@ public final class ColoredLogHandler: LogHandler {
                 return
             }
 
-            base.log(event: LogEvent(
-                level: event.level,
-                message: Logger.Message(stringLiteral: coloredMessage(event.message.description, level: event.level)),
-                metadata: event.metadata,
-                source: event.source,
-                file: event.file,
-                function: event.function,
-                line: event.line,
-            ))
+            base.log(
+                event: LogEvent(
+                    level: event.level,
+                    message: Logger.Message(
+                        stringLiteral: coloredMessage(event.message.description, level: event.level),
+                    ),
+                    metadata: event.metadata,
+                    source: event.source,
+                    file: event.file,
+                    function: event.function,
+                    line: event.line,
+                ),
+            )
         }
     }
 }
@@ -85,9 +89,10 @@ private extension ColoredLogHandler {
     /// Colors each line independently so multi-line linker diagnostics do not leak terminal state.
     func coloredMessage(_ message: String, level: Logger.Level) -> String {
         let color = colorCode(for: level)
-        return message
-            .split(separator: "\n", omittingEmptySubsequences: false)
-            .map { "\(color)\($0)\u{001B}[0m" }
-            .joined(separator: "\n")
+        return
+            message
+                .split(separator: "\n", omittingEmptySubsequences: false)
+                .map { "\(color)\($0)\u{001B}[0m" }
+                .joined(separator: "\n")
     }
 }

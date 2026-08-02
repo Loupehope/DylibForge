@@ -163,6 +163,18 @@ Both tools handle input archives and framework binaries that contain several arc
 
 If an architecture is skipped during `dylib-forge-xc`, the output root `Info.plist` is updated. Its `AvailableLibraries` entry receives the actual `SupportedArchitectures`, and a converted archive receives its new `.dylib` `LibraryPath`. The library identifier and directory stay the same, so every manifest path continues to resolve.
 
+## Acceptance Tests
+
+The `dylib-forge-tests` executable builds device and Simulator framework fixtures for macOS, iOS, and watchOS, converts every XCFramework with DylibForge, then runs one shared Swift validation on macOS, iOS Simulator, and watchOS Simulator. It rejects duplicate-symbol diagnostics in the client build log.
+
+An Xcode installation with the macOS, iOS, and watchOS SDKs and [mise](https://mise.jdx.dev/) are required. Run the complete suite with:
+
+```bash
+mise install; swift run dylib-forge-tests acceptance
+```
+
+Omit `--xcode-path` to use the Xcode selected by `xcode-select`. All generated test artifacts live under `AcceptanceTests/.build` and are ignored by Git.
+
 ## Inspiration
 
 The idea for this project came from these materials:

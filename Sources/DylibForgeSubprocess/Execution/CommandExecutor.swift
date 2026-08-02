@@ -2,13 +2,26 @@ import Foundation
 import Logging
 import Subprocess
 
+/// Controls whether an executed command is echoed and its successful stderr is forwarded to the logger.
+public enum CommandLogging: Sendable {
+    /// Logs the command at info level and non-empty successful stderr at warning level.
+    case enabled
+    /// Captures output without forwarding it to the logger.
+    case disabled
+}
+
 /// Runs an external command and returns its standard output.
 public protocol CommandExecutor: AnyObject {
     /// Runs a command represented by its executable followed by arguments.
-    func run(arguments: [String]) async throws -> CommandResult
+    func run(arguments: [String], logging: CommandLogging) async throws -> CommandResult
 }
 
 public extension CommandExecutor {
+    /// Runs a command without forwarding its invocation or successful stderr to the logger.
+    func run(arguments: [String]) async throws -> CommandResult {
+        try await run(arguments: arguments, logging: .disabled)
+    }
+
     /// Runs a command represented by a variadic executable-and-arguments list.
     func run(_ arguments: String...) async throws -> CommandResult {
         try await run(arguments: arguments)
@@ -28,8 +41,8 @@ public final class DefaultCommandExecutor: CommandExecutor {
     }
 
     /// Runs a command represented by its executable followed by arguments.
-    public func run(arguments: [String]) async throws -> CommandResult {
-        try await executor.run(arguments: arguments)
+    public func run(arguments: [String], logging: CommandLogging) async throws -> CommandResult {
+        try await executor.run(arguments: arguments, logging: logging)
     }
 }
 
@@ -49,8 +62,8 @@ public final class DeveloperCommandExecutor: CommandExecutor {
     }
 
     /// Runs a command represented by its executable followed by arguments.
-    public func run(arguments: [String]) async throws -> CommandResult {
-        try await executor.run(arguments: arguments)
+    public func run(arguments: [String], logging: CommandLogging) async throws -> CommandResult {
+        try await executor.run(arguments: arguments, logging: logging)
     }
 }
 
@@ -63,9 +76,13 @@ private final class CommandExecutorImpl {
         self.logger = logger
     }
 
-    func run(arguments: [String]) async throws -> CommandResult {
+    func run(arguments: [String], logging: CommandLogging) async throws -> CommandResult {
         guard let executable = arguments.first else {
             throw DylibForgeError.message("Shell command is empty")
+        }
+
+        if logging == .enabled {
+            logger.info("Running command: \(arguments.joined(separator: " "))")
         }
 
         let result = try await Subprocess.run(
@@ -91,11 +108,11 @@ private final class CommandExecutorImpl {
             )
         }
 
-        if !trimmedStderr.isEmpty {
+        if logging == .enabled, !trimmedStderr.isEmpty {
             logger.warning("\(trimmedStderr)")
         }
 
-        return CommandResult(stdout: stdout)
+        return CommandResult(stdout: stdout, stderr: stderr)
     }
 }
 

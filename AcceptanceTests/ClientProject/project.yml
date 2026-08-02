@@ -1,0 +1,104 @@
+name: AcceptanceClient
+options:
+  minimumXcodeGenVersion: 2.38.0
+settings:
+  base:
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
+    GENERATE_INFOPLIST_FILE: YES
+    PRODUCT_BUNDLE_IDENTIFIER: com.dylibforge.acceptance.client
+    CODE_SIGN_IDENTITY: "-"
+    EXTRACT_APPINTENTS_METADATA: NO
+targets:
+  AcceptanceClient:
+    type: application
+    platform: macOS
+    scheme: {}
+    sources:
+      - path: Sources
+      - path: Validation/Sources
+    dependencies:
+      - sdk: AppIntents.framework
+      - framework: ../.build/Relinked/StaticFrameworkWithPrivateObjC.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithCxxDependency.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithDuplicateSymbols.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithExcludedObject.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithSwift.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithSwiftDependency.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithSwiftDependentFramework.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithObjC.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithObjCAndSwift.xcframework
+        embed: true
+  AcceptanceiOSSimulatorTests:
+    type: bundle.unit-test
+    platform: iOS
+    scheme:
+      testTargets:
+        - AcceptanceiOSSimulatorTests
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+        PRODUCT_BUNDLE_IDENTIFIER: com.dylibforge.acceptance.ios-tests
+    sources:
+      - path: Tests
+      - path: Validation/Sources
+    dependencies:
+      - framework: ../.build/Relinked/StaticFrameworkWithPrivateObjC.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithCxxDependency.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithDuplicateSymbols.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithExcludedObject.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithSwift.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithSwiftDependency.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithSwiftDependentFramework.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithObjC.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithObjCAndSwift.xcframework
+        embed: true
+  AcceptancewatchOSSimulatorTests:
+    type: bundle.unit-test
+    platform: watchOS
+    scheme:
+      testTargets:
+        - AcceptancewatchOSSimulatorTests
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        WATCHOS_DEPLOYMENT_TARGET: "9.0"
+        PRODUCT_BUNDLE_IDENTIFIER: com.dylibforge.acceptance.watchos-tests
+    sources:
+      - path: Tests
+      - path: Validation/Sources
+    dependencies:
+      - framework: ../.build/Relinked/StaticFrameworkWithPrivateObjC.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithCxxDependency.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithDuplicateSymbols.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithExcludedObject.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithSwift.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithSwiftDependency.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithSwiftDependentFramework.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithObjC.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithObjCAndSwift.xcframework
+        embed: true

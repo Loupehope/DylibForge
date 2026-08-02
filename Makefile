@@ -1,8 +1,10 @@
 # Developer commands.
-.PHONY: format release release-dylib-forge release-dylib-forge-xc
+.PHONY: format format-check release release-dylib-forge release-dylib-forge-xc
+
+NATIVE_SOURCE_FILES := $(shell find Sources AcceptanceTests -type f \( -name '*.c' -o -name '*.cc' -o -name '*.cpp' -o -name '*.cxx' -o -name '*.h' -o -name '*.hpp' -o -name '*.m' -o -name '*.mm' \) -not -path '*/.build/*' -not -path '*/.xcodeproj/*')
 
 # Keep release logs focused on tool output rather than echoed shell commands.
-.SILENT: release-dylib-forge release-dylib-forge-xc
+.SILENT: format format-check release release-dylib-forge release-dylib-forge-xc
 
 # Builds a universal macOS executable and packages it as `<product>.zip`.
 #
@@ -18,9 +20,15 @@ define release_binary
 	zip -j -m ./$(1).zip ./$(1)
 endef
 
-# Formats all Swift sources through the package plugin.
+# Formats every Swift, C, C++, and Objective-C source, including acceptance fixtures and the client project.
 format:
-	swift package plugin --allow-writing-to-package-directory swiftformat
+	swift run swiftformat Package.swift Sources AcceptanceTests --swiftversion 6.2
+	xcrun clang-format -i $(NATIVE_SOURCE_FILES)
+
+# Checks every Swift, C, C++, and Objective-C source without modifying it; suitable for CI.
+format-check:
+	swift run swiftformat Package.swift Sources AcceptanceTests --swiftversion 6.2 --lint
+	xcrun clang-format --dry-run --Werror $(NATIVE_SOURCE_FILES)
 
 # Packages every public command-line executable.
 release: release-dylib-forge release-dylib-forge-xc
