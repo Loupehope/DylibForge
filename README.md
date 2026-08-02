@@ -165,7 +165,7 @@ If an architecture is skipped during `dylib-forge-xc`, the output root `Info.pli
 
 ## Acceptance Tests
 
-The `dylib-forge-tests` executable builds device and Simulator framework fixtures for macOS, iOS, and watchOS, converts every XCFramework with DylibForge, then runs one shared Swift validation on macOS, iOS Simulator, and watchOS Simulator. It rejects duplicate-symbol diagnostics in the client build log.
+The `dylib-forge-tests` executable builds device and Simulator framework fixtures for macOS, iOS, and watchOS, converts every XCFramework with DylibForge, then runs one shared Swift validation on macOS, iOS Simulator, and watchOS Simulator. It rejects duplicate-symbol diagnostics in the macOS client build log and in both simulator test logs.
 
 An Xcode installation with the macOS, iOS, and watchOS SDKs and [mise](https://mise.jdx.dev/) are required. Run the complete suite with:
 

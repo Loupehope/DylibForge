@@ -1,2 +1,3 @@
 [tools]
 "aqua:yonaskolb/XcodeGen" = "2.46.0"
+"aqua:cpisciotta/xcbeautify" = "3.2.1"

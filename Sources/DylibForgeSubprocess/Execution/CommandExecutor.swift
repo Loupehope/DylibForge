@@ -11,20 +11,28 @@ public enum CommandLogging: Sendable {
 }
 
 /// Runs an external command and returns its standard output.
-public protocol CommandExecutor: AnyObject {
+public protocol CommandExecutor: AnyObject, Sendable {
     /// Runs a command represented by its executable followed by arguments.
-    func run(arguments: [String], logging: CommandLogging) async throws -> CommandResult
+    func run(_ arguments: [String], logging: CommandLogging) async throws -> CommandResult
 }
 
 public extension CommandExecutor {
     /// Runs a command without forwarding its invocation or successful stderr to the logger.
-    func run(arguments: [String]) async throws -> CommandResult {
-        try await run(arguments: arguments, logging: .disabled)
+    func run(_ arguments: [String]) async throws -> CommandResult {
+        try await run(arguments, logging: .disabled)
     }
+}
 
-    /// Runs a command represented by a variadic executable-and-arguments list.
-    func run(_ arguments: String...) async throws -> CommandResult {
-        try await run(arguments: arguments)
+public extension [String] {
+    /// Wraps an `xcodebuild` command with xcbeautify while preserving the xcodebuild exit status.
+    ///
+    /// `NSUnbufferedIO` and standard-error redirection let xcbeautify render concurrent Xcode output in order.
+    /// The Z shell's `pipefail` option ensures an Xcode failure is not hidden by a successful formatter process.
+    var xcbeautified: Self {
+        let command = map { "'\($0.replacingOccurrences(of: "'", with: "'\\\"'\\\"'"))'" }
+            .joined(separator: " ")
+        let script = "set -o pipefail\nNSUnbufferedIO=YES \(command) 2>&1 | xcbeautify"
+        return ["zsh", "-c", script]
     }
 }
 
@@ -41,8 +49,8 @@ public final class DefaultCommandExecutor: CommandExecutor {
     }
 
     /// Runs a command represented by its executable followed by arguments.
-    public func run(arguments: [String], logging: CommandLogging) async throws -> CommandResult {
-        try await executor.run(arguments: arguments, logging: logging)
+    public func run(_ arguments: [String], logging: CommandLogging) async throws -> CommandResult {
+        try await executor.run(arguments, logging: logging)
     }
 }
 
@@ -62,12 +70,12 @@ public final class DeveloperCommandExecutor: CommandExecutor {
     }
 
     /// Runs a command represented by its executable followed by arguments.
-    public func run(arguments: [String], logging: CommandLogging) async throws -> CommandResult {
-        try await executor.run(arguments: arguments, logging: logging)
+    public func run(_ arguments: [String], logging: CommandLogging) async throws -> CommandResult {
+        try await executor.run(arguments, logging: logging)
     }
 }
 
-private final class CommandExecutorImpl {
+private final class CommandExecutorImpl: Sendable {
     private let developerDirectory: String?
     private let logger: Logger
 
@@ -76,7 +84,7 @@ private final class CommandExecutorImpl {
         self.logger = logger
     }
 
-    func run(arguments: [String], logging: CommandLogging) async throws -> CommandResult {
+    func run(_ arguments: [String], logging: CommandLogging) async throws -> CommandResult {
         guard let executable = arguments.first else {
             throw DylibForgeError.message("Shell command is empty")
         }
@@ -103,8 +111,11 @@ private final class CommandExecutorImpl {
             case let .signaled(code):
                 Int32(code)
             }
+            let commandOutput = [stdout, stderr]
+                .filter { !$0.isEmpty }
+                .joined(separator: "\n")
             throw DylibForgeError.message(
-                "Command exited with status \(exitCode): \(arguments.joined(separator: " "))\n\(stderr)",
+                "Command exited with status \(exitCode): \(arguments.joined(separator: " "))\n\(commandOutput)",
             )
         }
 

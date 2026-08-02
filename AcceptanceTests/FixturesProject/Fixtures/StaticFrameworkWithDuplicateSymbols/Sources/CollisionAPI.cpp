@@ -2,10 +2,18 @@
 
 namespace dylib_forge_acceptance {
 int repeated_measurement();
+int repeated_measurement_a();
+int repeated_measurement_b();
 
-int bridged_measurement() { return repeated_measurement(); }
+class DuplicateSymbolsValidator {
+  public:
+    int validate() const {
+        return repeated_measurement() + repeated_measurement_a() +
+               repeated_measurement_b();
+    }
+};
 } // namespace dylib_forge_acceptance
 
-extern "C" int validate(void) {
-    return dylib_forge_acceptance::bridged_measurement();
+extern "C" int validateStaticFrameworkWithDuplicateSymbols(void) {
+    return dylib_forge_acceptance::DuplicateSymbolsValidator().validate();
 }

@@ -1,3 +1,4 @@
+import DylibForgeSubprocess
 import Foundation
 
 enum SimulatorPlatform: CaseIterable {
@@ -49,10 +50,10 @@ struct SimulatorList: Decodable {
     }
 }
 
-enum AcceptanceTestError: LocalizedError {
+enum AcceptanceTestError: UserFacingError {
     case message(String)
 
-    var errorDescription: String? {
+    var userFacingDescription: String {
         switch self {
         case let .message(message): message
         }

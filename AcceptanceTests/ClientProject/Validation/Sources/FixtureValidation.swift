@@ -1,5 +1,6 @@
 import Foundation
 import StaticFrameworkWithCxxDependency
+import StaticFrameworkWithDuplicateObjects
 import StaticFrameworkWithDuplicateSymbols
 import StaticFrameworkWithExcludedObject
 import StaticFrameworkWithObjC
@@ -8,6 +9,7 @@ import StaticFrameworkWithPrivateObjC
 import StaticFrameworkWithSwift
 import StaticFrameworkWithSwiftDependency
 import StaticFrameworkWithSwiftDependentFramework
+import StaticLibraryWithSwift
 
 final class FixtureValidation {
     func validate() throws {
@@ -28,15 +30,50 @@ private extension FixtureValidation {
 
     var fixtureResults: [(name: String, value: Int)] {
         [
-            ("StaticFrameworkWithPrivateObjC", Int(StaticFrameworkWithPrivateObjC.validate())),
-            ("StaticFrameworkWithCxxDependency", Int(StaticFrameworkWithCxxDependency.validate())),
-            ("StaticFrameworkWithDuplicateSymbols", Int(StaticFrameworkWithDuplicateSymbols.validate())),
-            ("StaticFrameworkWithExcludedObject", Int(StaticFrameworkWithExcludedObject.validate())),
-            ("StaticFrameworkWithSwift", StaticFrameworkWithSwift.validate()),
-            ("StaticFrameworkWithSwiftDependency", StaticFrameworkWithSwiftDependency.validate()),
-            ("StaticFrameworkWithSwiftDependentFramework", StaticFrameworkWithSwiftDependentFramework.validate()),
-            ("StaticFrameworkWithObjC", Int(StaticFrameworkWithObjC.validate())),
-            ("StaticFrameworkWithObjCAndSwift", StaticFrameworkWithObjCAndSwift.validate()),
+            (
+                "StaticFrameworkWithPrivateObjC",
+                Int(PrivateObjCImplementation().validate()),
+            ),
+            (
+                "StaticFrameworkWithCxxDependency",
+                CxxDependencyValidator().validate(),
+            ),
+            (
+                "StaticFrameworkWithDuplicateSymbols",
+                DuplicateSymbolsValidator().validate(),
+            ),
+            (
+                "StaticFrameworkWithDuplicateObjects",
+                DuplicateObjectsValidator().validate(),
+            ),
+            (
+                "StaticFrameworkWithExcludedObject",
+                ExcludedObjectValidator().validate(),
+            ),
+            (
+                "StaticFrameworkWithSwift",
+                SwiftValidator().validate(),
+            ),
+            (
+                "StaticLibraryWithSwift",
+                SwiftStaticLibraryValidator().validate(),
+            ),
+            (
+                "StaticFrameworkWithSwiftDependency",
+                SwiftDependencyValidator().validate(),
+            ),
+            (
+                "StaticFrameworkWithSwiftDependentFramework",
+                SwiftDependentFrameworkValidator().validate(),
+            ),
+            (
+                "StaticFrameworkWithObjC",
+                Int(ObjectiveCOnlyValidator().validate()),
+            ),
+            (
+                "StaticFrameworkWithObjCAndSwift",
+                MixedLanguageValidator().validate(),
+            ),
         ]
     }
 

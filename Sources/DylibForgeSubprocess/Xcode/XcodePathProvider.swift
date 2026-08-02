@@ -22,7 +22,7 @@ public final class XcodePathProvider {
 
 private extension XcodePathProvider {
     func selectedDeveloperDirectory() async throws -> String {
-        let developerDirectory = try await commandExecutor.run("xcode-select", "--print-path").stdout
+        let developerDirectory = try await commandExecutor.run(["xcode-select", "--print-path"]).stdout
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !developerDirectory.isEmpty else {
             throw DylibForgeError.message("Unable to determine the selected Xcode developer directory")
@@ -33,11 +33,7 @@ private extension XcodePathProvider {
     }
 
     func validateXcode(at xcodePath: String) async throws {
-        _ = try await commandExecutor.run(
-            "env",
-            "DEVELOPER_DIR=\(xcodePath)",
-            "xcodebuild",
-            "-version",
-        )
+        _ = try await DeveloperCommandExecutor(developerDirectory: xcodePath)
+            .run(["xcodebuild", "-version"].xcbeautified)
     }
 }

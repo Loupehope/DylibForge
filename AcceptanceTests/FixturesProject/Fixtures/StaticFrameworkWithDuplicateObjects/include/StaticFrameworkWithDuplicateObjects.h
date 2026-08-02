@@ -2,7 +2,7 @@
 extern "C" {
 #endif
 
-int validateStaticFrameworkWithCxxDependency(void);
+int validateStaticFrameworkWithDuplicateObjects(void);
 
 #ifdef __cplusplus
 }

@@ -1,13 +1,7 @@
 #import "StaticFrameworkWithObjC.h"
 
-@interface ObjectiveCOnlyValue : NSObject
-+ (NSInteger)value;
-@end
-
-@implementation ObjectiveCOnlyValue
-+ (NSInteger)value {
+@implementation ObjectiveCOnlyValidator
+- (NSInteger)validate {
     return 42;
 }
 @end
-
-int validate(void) { return (int)ObjectiveCOnlyValue.value; }

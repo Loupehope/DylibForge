@@ -70,7 +70,7 @@ final class XCFrameworkSDKNameResolver {
 
 private extension XCFrameworkSDKNameResolver {
     func discoverSDKs() async throws -> Set<String> {
-        let output = try await commandExecutor.run("xcodebuild", "-showsdks", "-json").stdout
+        let output = try await commandExecutor.run(["xcodebuild", "-showsdks", "-json"]).stdout
         let xcodeSDKs = try jsonDecoder.decode([XcodeSDK].self, from: Data(output.utf8))
         let sdkNames = Set(xcodeSDKs.map(\.platform))
 

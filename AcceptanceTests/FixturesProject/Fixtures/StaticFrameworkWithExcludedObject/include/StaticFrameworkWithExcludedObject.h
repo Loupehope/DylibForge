@@ -2,7 +2,7 @@
 extern "C" {
 #endif
 
-int validate(void);
+int validateStaticFrameworkWithExcludedObject(void);
 
 #ifdef __cplusplus
 }

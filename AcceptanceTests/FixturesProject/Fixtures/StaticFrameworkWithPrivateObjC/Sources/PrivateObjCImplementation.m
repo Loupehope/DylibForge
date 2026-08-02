@@ -1,9 +1,7 @@
 #import "StaticFrameworkWithPrivateObjC.h"
 
 @implementation PrivateObjCImplementation
-+ (NSInteger)fixtureValue {
+- (NSInteger)validate {
     return 42;
 }
 @end
-
-int validate(void) { return (int)PrivateObjCImplementation.fixtureValue; }

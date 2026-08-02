@@ -38,18 +38,24 @@ struct DylibForgeCLI: AsyncParsableCommand {
 
     func run() async throws {
         LoggingSystem.bootstrap { ColoredLogHandler.standardError(label: $0) }
+        let logger = Logger(label: "dylib-forge")
 
-        try await DylibForge.run(
-            inputPath: input,
-            outputPath: output,
-            sdk: sdk,
-            installName: installName,
-            relinkOptions: RelinkOptions(
-                linkerArgs: ScopedValues(base: linkerArg),
-                ignoredAutolinkDependencies: ScopedValues(base: ignoreAutolink),
-                excludedObjectNamePatterns: ScopedValues(base: excludeObject),
-            ),
-            xcodePath: xcodePath,
-        )
+        do {
+            try await DylibForge.run(
+                inputPath: input,
+                outputPath: output,
+                sdk: sdk,
+                installName: installName,
+                relinkOptions: RelinkOptions(
+                    linkerArgs: ScopedValues(base: linkerArg),
+                    ignoredAutolinkDependencies: ScopedValues(base: ignoreAutolink),
+                    excludedObjectNamePatterns: ScopedValues(base: excludeObject),
+                ),
+                xcodePath: xcodePath,
+            )
+        } catch {
+            logger.error("\(ErrorPresenter.message(for: error))")
+            throw ExitCode.failure
+        }
     }
 }

@@ -36,17 +36,23 @@ struct DylibForgeXCFrameworkCLI: AsyncParsableCommand {
 
     func run() async throws {
         LoggingSystem.bootstrap { ColoredLogHandler.standardError(label: $0) }
+        let logger = Logger(label: "dylib-forge.xcframework")
 
-        try await DylibForgeXCFramework.run(
-            inputPath: input,
-            outputPath: output,
-            sdkArguments: XCFrameworkSDKArguments(
-                linkerArgs: linkerArgSDK,
-                ignoredAutolinkDependencies: ignoreAutolinkSDK,
-                excludedObjectNamePatterns: excludeObjectSDK,
-            ),
-            xcframeworkDependencies: xcframeworkDependency,
-            xcodePath: xcodePath,
-        )
+        do {
+            try await DylibForgeXCFramework.run(
+                inputPath: input,
+                outputPath: output,
+                sdkArguments: XCFrameworkSDKArguments(
+                    linkerArgs: linkerArgSDK,
+                    ignoredAutolinkDependencies: ignoreAutolinkSDK,
+                    excludedObjectNamePatterns: excludeObjectSDK,
+                ),
+                xcframeworkDependencies: xcframeworkDependency,
+                xcodePath: xcodePath,
+            )
+        } catch {
+            logger.error("\(ErrorPresenter.message(for: error))")
+            throw ExitCode.failure
+        }
     }
 }

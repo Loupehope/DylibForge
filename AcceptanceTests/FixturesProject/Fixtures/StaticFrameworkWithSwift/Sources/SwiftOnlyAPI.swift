@@ -1,5 +1,9 @@
 import Foundation
 
-public func validate() -> Int {
-    42
+public final class SwiftValidator {
+    public init() {}
+
+    public func validate() -> Int {
+        42
+    }
 }

@@ -28,6 +28,13 @@ private struct Acceptance: AsyncParsableCommand {
     /// Runs the entire acceptance workflow with one selected Xcode toolchain.
     mutating func run() async throws {
         LoggingSystem.bootstrap { ColoredLogHandler.standardError(label: $0) }
-        try await AcceptanceTestRunner.run(xcodePath: xcodePath)
+        let logger = Logger(label: "dylib-forge.acceptance")
+
+        do {
+            try await AcceptanceTestRunner.run(xcodePath: xcodePath)
+        } catch {
+            logger.error("\(ErrorPresenter.message(for: error))")
+            throw ExitCode.failure
+        }
     }
 }

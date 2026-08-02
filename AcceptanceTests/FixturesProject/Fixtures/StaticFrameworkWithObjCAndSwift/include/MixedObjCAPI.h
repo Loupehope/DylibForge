@@ -1,7 +1,7 @@
 #import <Foundation/Foundation.h>
 
 @interface MixedLanguageMarker : NSObject
-+ (NSInteger)value;
+- (NSInteger)validate;
 @end
 
 NSInteger MixedLanguageMarkerValue(void);

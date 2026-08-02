@@ -90,7 +90,7 @@ private extension ArchiveRelinker {
             try environment.files.copyItem(at: onlySlice, to: mergedBinaryURL)
         } else {
             _ = try await environment.shell.run(
-                arguments: ["lipo", "-create"] + dynamicSlices.map(\.path) + ["-output", mergedBinaryURL.path],
+                ["lipo", "-create"] + dynamicSlices.map(\.path) + ["-output", mergedBinaryURL.path],
             )
         }
 
@@ -122,7 +122,9 @@ private extension ArchiveRelinker {
 
         // Fat archives must be thinned before archive extraction and linking.
         if isUniversalInput {
-            _ = try await environment.shell.run("lipo", target.binaryURL.path, "-thin", architecture, "-output", thinArchiveURL.path)
+            _ = try await environment.shell.run([
+                "lipo", target.binaryURL.path, "-thin", architecture, "-output", thinArchiveURL.path,
+            ])
         } else {
             try environment.files.copyItem(at: target.binaryURL, to: thinArchiveURL)
         }

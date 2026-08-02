@@ -27,8 +27,8 @@ final class ClangLinker {
 
     /// Returns the architecture list and fat/universal-file flag.
     func detectArchitectures(in binaryURL: URL) async throws -> ArchitectureSlices {
-        let architecturesResult = try await environment.shell.run("lipo", "-archs", binaryURL.path)
-        let infoResult = try await environment.shell.run("lipo", "-info", binaryURL.path)
+        let architecturesResult = try await environment.shell.run(["lipo", "-archs", binaryURL.path])
+        let infoResult = try await environment.shell.run(["lipo", "-info", binaryURL.path])
         let architectures = architecturesResult.stdout.split(whereSeparator: { $0.isWhitespace }).map(String.init)
 
         guard !architectures.isEmpty else {
@@ -114,19 +114,19 @@ final class ClangLinker {
                 sdkPath: sdkPath,
                 architecture: architecture,
             )
-            _ = try await environment.shell.run(
+            _ = try await environment.shell.run([
                 "xcrun",
                 "--sdk", sdk,
                 "swiftc",
                 "-target", targetTriples.swift,
                 "-print-target-info",
-            )
+            ])
             return true
         } catch {
             logger.warning("""
             Skipping `\(architecture)` for `\(sdk)`: the selected Xcode cannot build this architecture.
             Its version or SDK support may be too new or too old:
-            \(error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines))
+            \(ErrorPresenter.message(for: error))
             """)
             return false
         }
@@ -212,7 +212,7 @@ final class ClangLinker {
             "@\(responseFileURL.path)",
         ]
 
-        _ = try await environment.shell.run(arguments: command)
+        _ = try await environment.shell.run(command)
     }
 }
 
@@ -224,13 +224,13 @@ private extension ClangLinker {
             return []
         }
 
-        let result = try await environment.shell.run(
+        let result = try await environment.shell.run([
             "xcrun",
             "--sdk", context.sdk,
             "swiftc",
             "-target", context.targetTriples.swift,
             "-print-target-info",
-        )
+        ])
         let targetInfo = try JSONDecoder().decode(SwiftTargetInfo.self, from: Data(result.stdout.utf8))
 
         return targetInfo.paths.runtimeLibraryPaths
@@ -238,7 +238,7 @@ private extension ClangLinker {
 
     /// Returns the physical path to the selected SDK.
     func resolveSDKPath(for sdk: String) async throws -> String {
-        let result = try await environment.shell.run("xcrun", "--sdk", sdk, "--show-sdk-path")
+        let result = try await environment.shell.run(["xcrun", "--sdk", sdk, "--show-sdk-path"])
         let path = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !path.isEmpty else {

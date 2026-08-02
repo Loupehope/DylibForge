@@ -17,16 +17,19 @@ targets:
       - path: Sources
       - path: Validation/Sources
     dependencies:
-      - sdk: AppIntents.framework
       - framework: ../.build/Relinked/StaticFrameworkWithPrivateObjC.xcframework
         embed: true
       - framework: ../.build/Relinked/StaticFrameworkWithCxxDependency.xcframework
         embed: true
       - framework: ../.build/Relinked/StaticFrameworkWithDuplicateSymbols.xcframework
         embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithDuplicateObjects.xcframework
+        embed: true
       - framework: ../.build/Relinked/StaticFrameworkWithExcludedObject.xcframework
         embed: true
       - framework: ../.build/Relinked/StaticFrameworkWithSwift.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticLibraryWithSwift.xcframework
         embed: true
       - framework: ../.build/Relinked/StaticFrameworkWithSwiftDependency.xcframework
         embed: true
@@ -47,6 +50,7 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         IPHONEOS_DEPLOYMENT_TARGET: "16.0"
         PRODUCT_BUNDLE_IDENTIFIER: com.dylibforge.acceptance.ios-tests
+        EXTRACT_APPINTENTS_METADATA: NO
     sources:
       - path: Tests
       - path: Validation/Sources
@@ -57,9 +61,13 @@ targets:
         embed: true
       - framework: ../.build/Relinked/StaticFrameworkWithDuplicateSymbols.xcframework
         embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithDuplicateObjects.xcframework
+        embed: true
       - framework: ../.build/Relinked/StaticFrameworkWithExcludedObject.xcframework
         embed: true
       - framework: ../.build/Relinked/StaticFrameworkWithSwift.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticLibraryWithSwift.xcframework
         embed: true
       - framework: ../.build/Relinked/StaticFrameworkWithSwiftDependency.xcframework
         embed: true
@@ -80,6 +88,7 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         WATCHOS_DEPLOYMENT_TARGET: "9.0"
         PRODUCT_BUNDLE_IDENTIFIER: com.dylibforge.acceptance.watchos-tests
+        EXTRACT_APPINTENTS_METADATA: NO
     sources:
       - path: Tests
       - path: Validation/Sources
@@ -90,9 +99,13 @@ targets:
         embed: true
       - framework: ../.build/Relinked/StaticFrameworkWithDuplicateSymbols.xcframework
         embed: true
+      - framework: ../.build/Relinked/StaticFrameworkWithDuplicateObjects.xcframework
+        embed: true
       - framework: ../.build/Relinked/StaticFrameworkWithExcludedObject.xcframework
         embed: true
       - framework: ../.build/Relinked/StaticFrameworkWithSwift.xcframework
+        embed: true
+      - framework: ../.build/Relinked/StaticLibraryWithSwift.xcframework
         embed: true
       - framework: ../.build/Relinked/StaticFrameworkWithSwiftDependency.xcframework
         embed: true

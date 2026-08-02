@@ -1,3 +1,5 @@
 #import <Foundation/Foundation.h>
 
-int validate(void);
+@interface ObjectiveCOnlyValidator : NSObject
+- (NSInteger)validate;
+@end

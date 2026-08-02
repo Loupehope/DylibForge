@@ -2,7 +2,5 @@
 
 __attribute__((visibility("hidden")))
 @interface PrivateObjCImplementation : NSObject
-+ (NSInteger)fixtureValue;
+- (NSInteger)validate;
 @end
-
-int validate(void);

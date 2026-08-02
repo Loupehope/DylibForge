@@ -8,10 +8,14 @@ enum Fixture: String, CaseIterable, Sendable {
     case cxxDependency = "StaticFrameworkWithCxxDependency"
     /// A framework with duplicate native definitions that need de-duplication.
     case duplicateSymbols = "StaticFrameworkWithDuplicateSymbols"
+    /// A framework with byte-identical native object files that must be skipped.
+    case duplicateObjects = "StaticFrameworkWithDuplicateObjects"
     /// A framework with an intentionally excluded object file.
     case excludedObject = "StaticFrameworkWithExcludedObject"
     /// A framework composed entirely of Swift source.
     case swift = "StaticFrameworkWithSwift"
+    /// A Swift static library packaged and relinked through an XCFramework.
+    case swiftStaticLibrary = "StaticLibraryWithSwift"
     /// A Swift framework consumed by another Swift fixture framework.
     case swiftDependency = "StaticFrameworkWithSwiftDependency"
     /// A Swift framework that imports the Swift dependency fixture.
@@ -38,6 +42,40 @@ enum Fixture: String, CaseIterable, Sendable {
             [.swiftDependency]
         default:
             []
+        }
+    }
+
+    /// The archive product supplied to `xcodebuild -create-xcframework` for each platform slice.
+    var archiveProduct: ArchiveProduct {
+        switch self {
+        case .swiftStaticLibrary:
+            .staticLibrary
+        default:
+            .framework
+        }
+    }
+}
+
+/// The product form exported by a fixture archive.
+enum ArchiveProduct {
+    case framework
+    case staticLibrary
+
+    /// The archive-relative product path for a fixture and platform slice.
+    func path(for fixture: Fixture) -> String {
+        switch self {
+        case .framework:
+            "Products/Library/Frameworks/\(fixture.rawValue).framework"
+        case .staticLibrary:
+            "Products/usr/local/lib/lib\(fixture.rawValue).a"
+        }
+    }
+
+    /// The `xcodebuild -create-xcframework` argument name for this product.
+    var xcodebuildArgument: String {
+        switch self {
+        case .framework: "-framework"
+        case .staticLibrary: "-library"
         }
     }
 }

@@ -35,6 +35,25 @@ targetTemplates:
         PRODUCT_BUNDLE_IDENTIFIER: com.dylibforge.acceptance.fixture
     sources:
       - path: Fixtures/StaticFrameworkWithCxxDependency/CxxStaticDependency/Sources
+  static-swift-library:
+    type: library.static
+    scheme: {}
+    settings:
+      base:
+        SKIP_INSTALL: NO
+        BUILD_LIBRARY_FOR_DISTRIBUTION: YES
+        DEFINES_MODULE: YES
+        SWIFT_VERSION: "6.0"
+        PRODUCT_BUNDLE_IDENTIFIER: com.dylibforge.acceptance.fixture
+    sources:
+      - path: Fixtures/${fixture}/Sources
+    postBuildScripts:
+      - name: Install Swift module
+        basedOnDependencyAnalysis: false
+        script: |
+          if [ "$BUILT_PRODUCTS_DIR" != "$TARGET_BUILD_DIR" ]; then
+            ditto "$BUILT_PRODUCTS_DIR/$PRODUCT_MODULE_NAME.swiftmodule" "$TARGET_BUILD_DIR/$PRODUCT_MODULE_NAME.swiftmodule"
+          fi
 targets:
   StaticFrameworkWithPrivateObjC_macOS:
     templates: [static-framework]
@@ -170,6 +189,67 @@ targets:
     templateAttributes: { fixture: StaticFrameworkWithDuplicateSymbols }
     settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateSymbols, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
 
+  StaticFrameworkWithDuplicateObjects_macOS:
+    templates: [static-framework]
+    platform: macOS
+    templateAttributes: { fixture: StaticFrameworkWithDuplicateObjects }
+    postBuildScripts:
+      - name: Duplicate native object
+        basedOnDependencyAnalysis: false
+        script: |
+          object_file="$(find "$OBJECT_FILE_DIR_normal" -name RepeatedObject.o -print -quit)"
+          libtool -static -o "$TARGET_TEMP_DIR/duplicated.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH" "$object_file"
+          mv "$TARGET_TEMP_DIR/duplicated.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH"
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateObjects, MACOSX_DEPLOYMENT_TARGET: "15.0" } }
+  StaticFrameworkWithDuplicateObjects_iOS:
+    templates: [static-framework]
+    platform: iOS
+    templateAttributes: { fixture: StaticFrameworkWithDuplicateObjects }
+    postBuildScripts:
+      - name: Duplicate native object
+        basedOnDependencyAnalysis: false
+        script: |
+          object_file="$(find "$OBJECT_FILE_DIR_normal" -name RepeatedObject.o -print -quit)"
+          libtool -static -o "$TARGET_TEMP_DIR/duplicated.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH" "$object_file"
+          mv "$TARGET_TEMP_DIR/duplicated.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH"
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateObjects, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+  StaticFrameworkWithDuplicateObjects_iOSSimulator:
+    templates: [static-framework]
+    platform: iOS
+    templateAttributes: { fixture: StaticFrameworkWithDuplicateObjects }
+    postBuildScripts:
+      - name: Duplicate native object
+        basedOnDependencyAnalysis: false
+        script: |
+          object_file="$(find "$OBJECT_FILE_DIR_normal" -name RepeatedObject.o -print -quit)"
+          libtool -static -o "$TARGET_TEMP_DIR/duplicated.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH" "$object_file"
+          mv "$TARGET_TEMP_DIR/duplicated.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH"
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateObjects, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+  StaticFrameworkWithDuplicateObjects_watchOS:
+    templates: [static-framework]
+    platform: watchOS
+    templateAttributes: { fixture: StaticFrameworkWithDuplicateObjects }
+    postBuildScripts:
+      - name: Duplicate native object
+        basedOnDependencyAnalysis: false
+        script: |
+          object_file="$(find "$OBJECT_FILE_DIR_normal" -name RepeatedObject.o -print -quit)"
+          libtool -static -o "$TARGET_TEMP_DIR/duplicated.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH" "$object_file"
+          mv "$TARGET_TEMP_DIR/duplicated.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH"
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateObjects, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+  StaticFrameworkWithDuplicateObjects_watchOSSimulator:
+    templates: [static-framework]
+    platform: watchOS
+    templateAttributes: { fixture: StaticFrameworkWithDuplicateObjects }
+    postBuildScripts:
+      - name: Duplicate native object
+        basedOnDependencyAnalysis: false
+        script: |
+          object_file="$(find "$OBJECT_FILE_DIR_normal" -name RepeatedObject.o -print -quit)"
+          libtool -static -o "$TARGET_TEMP_DIR/duplicated.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH" "$object_file"
+          mv "$TARGET_TEMP_DIR/duplicated.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH"
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateObjects, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+
   StaticFrameworkWithExcludedObject_macOS:
     templates: [static-framework]
     platform: macOS
@@ -221,6 +301,32 @@ targets:
     platform: watchOS
     templateAttributes: { fixture: StaticFrameworkWithSwift }
     settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwift, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+
+  StaticLibraryWithSwift_macOS:
+    templates: [static-swift-library]
+    platform: macOS
+    templateAttributes: { fixture: StaticLibraryWithSwift }
+    settings: { base: { PRODUCT_NAME: StaticLibraryWithSwift, MACOSX_DEPLOYMENT_TARGET: "15.0" } }
+  StaticLibraryWithSwift_iOS:
+    templates: [static-swift-library]
+    platform: iOS
+    templateAttributes: { fixture: StaticLibraryWithSwift }
+    settings: { base: { PRODUCT_NAME: StaticLibraryWithSwift, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+  StaticLibraryWithSwift_iOSSimulator:
+    templates: [static-swift-library]
+    platform: iOS
+    templateAttributes: { fixture: StaticLibraryWithSwift }
+    settings: { base: { PRODUCT_NAME: StaticLibraryWithSwift, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+  StaticLibraryWithSwift_watchOS:
+    templates: [static-swift-library]
+    platform: watchOS
+    templateAttributes: { fixture: StaticLibraryWithSwift }
+    settings: { base: { PRODUCT_NAME: StaticLibraryWithSwift, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+  StaticLibraryWithSwift_watchOSSimulator:
+    templates: [static-swift-library]
+    platform: watchOS
+    templateAttributes: { fixture: StaticLibraryWithSwift }
+    settings: { base: { PRODUCT_NAME: StaticLibraryWithSwift, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
 
   StaticFrameworkWithObjC_macOS:
     templates: [static-framework]

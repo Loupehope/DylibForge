@@ -1,3 +1,7 @@
-public func validate() -> Int {
-    42
+public final class SwiftDependencyValidator {
+    public init() {}
+
+    public func validate() -> Int {
+        42
+    }
 }

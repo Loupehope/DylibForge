@@ -1,9 +1,11 @@
 #import "MixedObjCAPI.h"
 
 @implementation MixedLanguageMarker
-+ (NSInteger)value {
+- (NSInteger)validate {
     return 42;
 }
 @end
 
-NSInteger MixedLanguageMarkerValue(void) { return [MixedLanguageMarker value]; }
+NSInteger MixedLanguageMarkerValue(void) {
+    return [[MixedLanguageMarker new] validate];
+}
