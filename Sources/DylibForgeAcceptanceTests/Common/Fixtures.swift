@@ -25,7 +25,7 @@ enum Fixture: String, CaseIterable, Sendable {
     /// A framework that combines Objective-C and Swift source.
     case objectiveCAndSwift = "StaticFrameworkWithObjCAndSwift"
 
-    /// Additional `dylib-forge-xc` arguments required by this scenario.
+    /// Additional `dylib-forge xc` arguments required by this scenario.
     var relinkingArguments: [String] {
         switch self {
         case .excludedObject:

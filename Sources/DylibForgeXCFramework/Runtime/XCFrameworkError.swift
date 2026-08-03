@@ -1,4 +1,4 @@
-import DylibForgeSubprocess
+import DylibForgeCore
 
 /// Errors surfaced by the XCFramework conversion command.
 enum XCFrameworkError: UserFacingError {

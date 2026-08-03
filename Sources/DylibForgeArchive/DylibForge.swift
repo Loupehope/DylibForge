@@ -1,4 +1,4 @@
-import DylibForgeSubprocess
+import DylibForgeCore
 import Foundation
 
 public enum DylibForge {

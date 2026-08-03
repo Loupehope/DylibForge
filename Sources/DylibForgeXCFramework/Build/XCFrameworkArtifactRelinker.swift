@@ -1,4 +1,4 @@
-import DylibForgeCore
+import DylibForgeArchive
 import Foundation
 
 /// Rebuilds one XCFramework artifact using the core archive relinker.

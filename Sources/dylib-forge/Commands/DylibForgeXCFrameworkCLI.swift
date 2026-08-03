@@ -1,16 +1,15 @@
 import ArgumentParser
+import DylibForgeArchive
 import DylibForgeCore
-import DylibForgeSubprocess
 import DylibForgeXCFramework
 import Foundation
 import Logging
 
-@main
 struct DylibForgeXCFrameworkCLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-        commandName: "dylib-forge-xc",
+        commandName: "xc",
         abstract: "Convert static XCFramework artifacts into dynamic libraries.",
-        version: "1.5.0",
+        aliases: ["xcframework"],
     )
 
     @Argument(help: "Path to the input XCFramework.")

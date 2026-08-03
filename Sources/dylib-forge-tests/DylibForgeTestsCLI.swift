@@ -1,6 +1,6 @@
 import ArgumentParser
 import DylibForgeAcceptanceTests
-import DylibForgeSubprocess
+import DylibForgeCore
 import Logging
 
 /// The command-line entry point for DylibForge's end-to-end acceptance suite.

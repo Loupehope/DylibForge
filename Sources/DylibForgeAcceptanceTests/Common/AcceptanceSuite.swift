@@ -1,5 +1,5 @@
 import ArgumentParser
-import DylibForgeSubprocess
+import DylibForgeCore
 import Foundation
 import Logging
 
@@ -45,13 +45,13 @@ final class AcceptanceSuite: Sendable {
         try fileManager.createDirectory(at: buildDirectory, withIntermediateDirectories: true)
     }
 
-    /// Builds the `dylib-forge-xc` executable consumed by the relinking stage.
+    /// Builds the `dylib-forge` executable consumed by the relinking stage.
     func buildDylibForge() async throws {
-        logger.notice("Building dylib-forge-xc")
+        logger.notice("Building dylib-forge")
         _ = try await shell.run([
-            "swift", "build", "--package-path", repositoryDirectory.path, "--product", "dylib-forge-xc",
+            "swift", "build", "--package-path", repositoryDirectory.path, "--product", "dylib-forge",
         ])
-        logger.notice("Built dylib-forge-xc")
+        logger.notice("Built dylib-forge")
     }
 
     /// Generates the fixtures Xcode project and builds every platform slice.
@@ -91,11 +91,11 @@ final class AcceptanceSuite: Sendable {
     func relinkFixtures() async throws {
         logger.notice("Relinking fixture XCFrameworks")
         try fileManager.createDirectory(at: relinkedDirectory, withIntermediateDirectories: true)
-        let forgeExecutable = repositoryDirectory.appendingPathComponent(".build/debug/dylib-forge-xc").path
+        let forgeExecutable = repositoryDirectory.appendingPathComponent(".build/debug/dylib-forge").path
 
         guard fileManager.isExecutableFile(atPath: forgeExecutable) else {
             throw ValidationError(
-                "dylib-forge-xc is missing: \(forgeExecutable). Run the `run` command or build it first.",
+                "dylib-forge is missing: \(forgeExecutable). Run the `run` command or build it first.",
             )
         }
 
@@ -173,6 +173,7 @@ private extension AcceptanceSuite {
         try removeIfPresent(outputURL)
         let arguments =
             [
+                "xc",
                 inputURL.path,
                 "--output", outputURL.path,
                 "--xcode-path", developerDirectory,

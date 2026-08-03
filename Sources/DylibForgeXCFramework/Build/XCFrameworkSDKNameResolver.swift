@@ -1,5 +1,5 @@
+import DylibForgeArchive
 import DylibForgeCore
-import DylibForgeSubprocess
 import Foundation
 
 /// Discovers the SDKs exposed by the Xcode selected through `xcode-select`.

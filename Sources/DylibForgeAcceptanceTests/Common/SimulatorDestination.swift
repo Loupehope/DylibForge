@@ -1,4 +1,4 @@
-import DylibForgeSubprocess
+import DylibForgeCore
 import Foundation
 
 enum SimulatorPlatform: CaseIterable {

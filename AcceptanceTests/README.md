@@ -1,6 +1,6 @@
 # DylibForge acceptance tests
 
-This directory contains reproducible end-to-end fixtures for `dylib-forge-xc`. The root SwiftPM executable `dylib-forge-tests acceptance` generates the Xcode projects with XcodeGen, builds each fixture as a static XCFramework, converts it with `dylib-forge-xc`, and validates the converted frameworks in a client.
+This directory contains reproducible end-to-end fixtures for `dylib-forge xc`. The root SwiftPM executable `dylib-forge-tests acceptance` generates the Xcode projects with XcodeGen, builds each fixture as a static XCFramework, converts it with `dylib-forge xc`, and validates the converted frameworks in a client.
 
 Every fixture has five slices:
 
@@ -51,7 +51,7 @@ Fixture slices and independent relink operations run concurrently. `concurrentMa
 
 1. Add the fixture source under `FixturesProject/Fixtures/<FixtureName>/Sources` and any public headers under `include`.
 2. Add five XcodeGen targets—one for every `Platform` case—to `FixturesProject/project.yml`. Keep extra implementation targets inside the same fixture directory, as the C++ and Swift dependency scenarios do.
-3. Add the fixture to `Sources/DylibForgeAcceptanceTests/Common/Fixtures.swift`. Put fixture-specific `dylib-forge-xc` options in `relinkingArguments` and converted-XCFramework dependencies in `xcframeworkDependencies`. For a static library, declare its `archiveProduct` and ensure its Swift module is installed into the archive.
+3. Add the fixture to `Sources/DylibForgeAcceptanceTests/Common/Fixtures.swift`. Put fixture-specific `dylib-forge xc` options in `relinkingArguments` and converted-XCFramework dependencies in `xcframeworkDependencies`. For a static library, declare its `archiveProduct` and ensure its Swift module is installed into the archive.
 4. Add the relinked XCFramework to the macOS client and both simulator Swift Testing targets in `ClientProject/project.yml`.
 5. Import the fixture module and add its validator construction and `validate()` call to `ClientProject/Validation/Sources/FixtureValidation.swift`. The common validation layer must produce an `Int`.
 

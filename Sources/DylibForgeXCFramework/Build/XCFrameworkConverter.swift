@@ -1,4 +1,4 @@
-import DylibForgeCore
+import DylibForgeArchive
 import Foundation
 import Logging
 

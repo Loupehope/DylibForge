@@ -2,10 +2,10 @@
 
 # DylibForge
 
-DylibForge converts static Apple `ar` archives into dynamic Mach-O libraries. It has two command-line tools built on the same relinking engine:
+DylibForge converts static Apple `ar` archives into dynamic Mach-O libraries. Its `dylib-forge` command has two subcommands built on the same relinking engine:
 
-- [dylib-forge-xc](#convert-an-xcframework) converts a complete XCFramework.
-- [dylib-forge](#convert-one-archive-or-framework-binary) converts one archive or one static framework binary.
+- [`xc` (or `xcframework`)](#convert-an-xcframework) converts a complete XCFramework.
+- [`ar` (or `archive`)](#convert-one-archive-or-framework-binary) converts one archive or one static framework binary.
 
 Download the latest binaries from [GitHub Releases](https://github.com/Loupehope/DylibForge/releases/latest).
 
@@ -13,10 +13,10 @@ Download the latest binaries from [GitHub Releases](https://github.com/Loupehope
 
 ## Convert an XCFramework
 
-Use `dylib-forge-xc` to convert a complete XCFramework. The output path may be the same as the input path.
+Use `dylib-forge xc` to convert a complete XCFramework. The output path may be the same as the input path.
 
 ```bash
-dylib-forge-xc ./Library.xcframework \
+dylib-forge xc ./Library.xcframework \
   --output ./LibraryDynamic.xcframework
 ```
 
@@ -48,7 +48,7 @@ Use SDK-specific controls when linker arguments, ignored autolink dependencies, 
 - Values in an `any` group apply to every slice, and values from a specific SDK group are added only to that SDK's slices.
 
 ```bash
-dylib-forge-xc ./Library.xcframework --output ./LibraryDynamic.xcframework \
+dylib-forge xc ./Library.xcframework --output ./LibraryDynamic.xcframework \
   --linker-arg-sdk any \
   --linker-arg-sdk -lc++ \
   --linker-arg-sdk iphoneos \
@@ -65,7 +65,7 @@ This links `-lc++` for every slice, `CoreMedia` only for iOS-device slices, and 
 Use `--xcframework-dependency` when the dependency is itself an XCFramework. DylibForge finds the slice with the same platform, variant, and architecture as the library currently being rebuilt, then adds its framework search path and framework name to the linker invocation.
 
 ```bash
-dylib-forge-xc ./Library.xcframework \
+dylib-forge xc ./Library.xcframework \
   --output ./LibraryDynamic.xcframework \
   --xcframework-dependency ./Dependency.xcframework
 ```
@@ -73,7 +73,7 @@ dylib-forge-xc ./Library.xcframework \
 The same dependency can also be specified explicitly with `--linker-arg-sdk`:
 
 ```bash
-dylib-forge-xc ./Library.xcframework --output ./LibraryDynamic.xcframework \
+dylib-forge xc ./Library.xcframework --output ./LibraryDynamic.xcframework \
   --linker-arg-sdk iphoneos \
   --linker-arg-sdk -F \
   --linker-arg-sdk ./Dependency.xcframework/ios-arm64 \
@@ -88,10 +88,10 @@ dylib-forge-xc ./Library.xcframework --output ./LibraryDynamic.xcframework \
 
 ## Convert One Archive or Framework Binary
 
-Use `dylib-forge` to convert one standalone archive or framework executable. The output path may be the same as the input path.
+Use `dylib-forge ar` to convert one standalone archive or framework executable. The output path may be the same as the input path.
 
 ```bash
-dylib-forge ./Library.framework/Library \
+dylib-forge ar ./Library.framework/Library \
   --output ./Library.framework/Library \
   --sdk iphoneos \
   --install-name @rpath/Library.framework/Library \
@@ -128,7 +128,7 @@ You can either defer undefined symbols to the app that loads the dylib, or link 
 For a quick attempt at unresolved symbols, pass `-Wl,-undefined,dynamic_lookup` through a `--linker-arg-sdk any` group:
 
 ```bash
-dylib-forge-xc ./Library.xcframework \
+dylib-forge xc ./Library.xcframework \
   --output ./LibraryDynamic.xcframework \
   --linker-arg-sdk any \
   --linker-arg-sdk -Wl,-undefined,dynamic_lookup
@@ -141,7 +141,7 @@ This asks the final app to resolve undefined symbols at load time. Apple depreca
 Instead of `-Wl,-undefined,dynamic_lookup`, pass the frameworks and libraries that the dynamic binary should link.
 
 ```bash
-dylib-forge-xc ./Library.xcframework \
+dylib-forge xc ./Library.xcframework \
   --output ./LibraryDynamic.xcframework \
   --linker-arg-sdk any \
   --linker-arg-sdk -framework \
@@ -157,23 +157,19 @@ dylib-forge-xc ./Library.xcframework \
 
 ## Architecture Support
 
-Both tools handle input archives and framework binaries that contain several architecture slices. Before relinking a static slice, DylibForge asks the selected Xcode whether its SDK and toolchain support that target.
+Both subcommands handle input archives and framework binaries that contain several architecture slices. Before relinking a static slice, DylibForge asks the selected Xcode whether its SDK and toolchain support that target.
 
 > Pass `--xcode-path /Applications/Xcode.app` to select Xcode for that command only. Otherwise the Xcode selected by `xcode-select` is used. If it does not support a target, the tool logs a warning and continues with the remaining supported architectures.
 
-If an architecture is skipped during `dylib-forge-xc`, the output root `Info.plist` is updated. Its `AvailableLibraries` entry receives the actual `SupportedArchitectures`, and a converted archive receives its new `.dylib` `LibraryPath`. The library identifier and directory stay the same, so every manifest path continues to resolve.
+If an architecture is skipped during `dylib-forge xc`, the output root `Info.plist` is updated. Its `AvailableLibraries` entry receives the actual `SupportedArchitectures`, and a converted archive receives its new `.dylib` `LibraryPath`. The library identifier and directory stay the same, so every manifest path continues to resolve.
 
 ## Acceptance Tests
 
-The `dylib-forge-tests` executable builds device and Simulator framework fixtures for macOS, iOS, and watchOS, converts every XCFramework with DylibForge, then runs one shared Swift validation on macOS, iOS Simulator, and watchOS Simulator. It rejects duplicate-symbol diagnostics in the macOS client build log and in both simulator test logs.
-
-An Xcode installation with the macOS, iOS, and watchOS SDKs and [mise](https://mise.jdx.dev/) are required. Run the complete suite with:
+The `dylib-forge-tests` executable builds device and Simulator framework fixtures for macOS, iOS, and watchOS, converts every XCFramework with DylibForge, then runs one shared Swift validation on macOS, iOS Simulator, and watchOS Simulator:
 
 ```bash
 mise install; swift run dylib-forge-tests acceptance
 ```
-
-Omit `--xcode-path` to use the Xcode selected by `xcode-select`. All generated test artifacts live under `AcceptanceTests/.build` and are ignored by Git.
 
 ## Inspiration
 

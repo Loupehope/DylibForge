@@ -1,5 +1,5 @@
+import DylibForgeArchive
 import DylibForgeCore
-import DylibForgeSubprocess
 
 /// Raw SDK-grouped arguments accepted by the XCFramework converter.
 ///

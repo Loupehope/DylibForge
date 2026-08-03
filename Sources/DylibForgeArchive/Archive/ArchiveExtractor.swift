@@ -1,4 +1,4 @@
-import DylibForgeSubprocess
+import DylibForgeCore
 import Foundation
 
 /// Extracts Mach-O object files from an `ar` archive.
