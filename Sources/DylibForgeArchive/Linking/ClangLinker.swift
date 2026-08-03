@@ -1,10 +1,9 @@
 import DylibForgeCore
 import Foundation
-import Logging
 
 /// Drives architecture discovery, autolink extraction, and the final `clang -dynamiclib` invocation.
 final class ClangLinker {
-    private let logger: Logger
+    private let logger: DylibForgeLogger
     private let environment: ToolEnvironment
     private let machoEditor: MachOEditor
     private let directiveParser: AutolinkDirectiveParser
@@ -16,7 +15,7 @@ final class ClangLinker {
         machoEditor: MachOEditor,
         directiveParser: AutolinkDirectiveParser = AutolinkDirectiveParser(),
         frameworkFilter: AutolinkFrameworkFilter = AutolinkFrameworkFilter(),
-        logger: Logger = Logger(label: "dylib-forge.link"),
+        logger: DylibForgeLogger = DylibForgeLogger(),
     ) {
         self.environment = environment
         self.machoEditor = machoEditor

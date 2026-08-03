@@ -1,11 +1,12 @@
 import DylibForgeCore
 import Foundation
 
-enum SimulatorPlatform: CaseIterable {
+enum SimulatorPlatform: CaseIterable, Sendable {
     case iOS
     case watchOS
 
-    var runtimeIdentifierFragment: String {
+    /// The runtime identifier prefix used by CoreSimulator for this platform.
+    var runtimeIdentifierPrefix: String {
         switch self {
         case .iOS: ".iOS-"
         case .watchOS: ".watchOS-"
@@ -19,43 +20,73 @@ enum SimulatorPlatform: CaseIterable {
         }
     }
 
+    /// SDK name accepted by `xcrun --sdk` when resolving the Xcode-supported runtime version.
+    var simulatorSDK: String {
+        switch self {
+        case .iOS: "iphonesimulator"
+        case .watchOS: "watchsimulator"
+        }
+    }
+
     var testScheme: String {
         switch self {
         case .iOS: "AcceptanceiOSSimulatorTests"
         case .watchOS: "AcceptancewatchOSSimulatorTests"
         }
     }
-}
 
-struct SimulatorDestination: Decodable {
-    let udid: String
-    let isAvailable: Bool
-}
-
-struct SimulatorList: Decodable {
-    let devices: [String: [SimulatorDestination]]
-
-    func destination(for platform: SimulatorPlatform) throws -> String {
-        let device = devices
-            .filter { $0.key.contains(platform.runtimeIdentifierFragment) }
-            .sorted { $0.key > $1.key }
-            .lazy
-            .flatMap(\.value)
-            .first(where: \.isAvailable)
-
-        guard let device else {
-            throw AcceptanceTestError.message("No available \(platform.xcodeDestinationPlatform) device was found.")
+    func supports(_ device: SimulatorDestination) -> Bool {
+        switch self {
+        case .iOS:
+            device.isPhone
+        case .watchOS:
+            device.isWatch
         }
-        return "platform=\(platform.xcodeDestinationPlatform),id=\(device.udid)"
     }
 }
 
-enum AcceptanceTestError: UserFacingError {
-    case message(String)
+struct SimulatorDestination: Decodable, Sendable {
+    let udid: String
+    let isAvailable: Bool
+    let deviceTypeIdentifier: String
 
-    var userFacingDescription: String {
-        switch self {
-        case let .message(message): message
+    var isPhone: Bool {
+        deviceTypeIdentifier.contains(".iPhone-")
+    }
+
+    var isWatch: Bool {
+        deviceTypeIdentifier.contains(".Apple-Watch-")
+    }
+}
+
+struct SimulatorList: Decodable, Sendable {
+    let devices: [String: [SimulatorDestination]]
+
+    /// Returns an available device in the deployment-target-to-SDK version range.
+    func device(
+        for platform: SimulatorPlatform,
+        minimumDeploymentTarget: String,
+        maximumSDKPlatformVersion: String,
+    ) throws -> SimulatorDestination {
+        let device = devices.compactMap { runtimeIdentifier, devices -> (version: String, device: SimulatorDestination)? in
+            guard let range = runtimeIdentifier.range(of: platform.runtimeIdentifierPrefix) else {
+                return nil
+            }
+            let runtimeVersion = String(runtimeIdentifier[range.upperBound...]).replacingOccurrences(of: "-", with: ".")
+            guard
+                runtimeVersion.compare(minimumDeploymentTarget, options: .numeric) != .orderedAscending,
+                runtimeVersion.compare(maximumSDKPlatformVersion, options: .numeric) != .orderedDescending,
+                let device = devices.first(where: { $0.isAvailable && platform.supports($0) })
+            else { return nil }
+            return (runtimeVersion, device)
         }
+        .max { $0.version.compare($1.version, options: .numeric) == .orderedAscending }?.device
+
+        guard let device else {
+            throw DylibForgeError.message(
+                "No available \(platform.xcodeDestinationPlatform) device was found between deployment target \(minimumDeploymentTarget) and Xcode SDK \(maximumSDKPlatformVersion).",
+            )
+        }
+        return device
     }
 }

@@ -2,6 +2,11 @@
 
 # DylibForge
 
+[![Swift 6.2](https://img.shields.io/badge/Swift-6.2-F05138?logo=swift&logoColor=white)](https://www.swift.org/)
+[![GitHub Release](https://img.shields.io/github/v/release/Loupehope/DylibForge?display_name=tag&color=0969DA)](https://github.com/Loupehope/DylibForge/releases/latest)
+[![Swift Package Index](https://img.shields.io/badge/Swift_Package_Index-compatible-7B3FE4?logo=swift&logoColor=white)](https://swiftpackageindex.com/Loupehope/DylibForge)
+[![License MIT](https://img.shields.io/badge/license-MIT-2EA44F)](LICENSE)
+
 DylibForge converts static Apple `ar` archives into dynamic Mach-O libraries. Its `dylib-forge` command has two subcommands built on the same relinking engine:
 
 - [`xc` (or `xcframework`)](#convert-an-xcframework) converts a complete XCFramework.

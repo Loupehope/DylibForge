@@ -40,7 +40,7 @@ final class XCFrameworkSDKNameResolver {
         }
 
         guard let platform = library.supportedPlatform else {
-            throw XCFrameworkError.message("AvailableLibraries item has no SupportedPlatform")
+            throw DylibForgeError.message("AvailableLibraries item has no SupportedPlatform")
         }
         switch (platform, library.supportedPlatformVariant) {
         case ("ios", "simulator"):
@@ -63,7 +63,7 @@ final class XCFrameworkSDKNameResolver {
             return "macosx"
         default:
             let variant = library.supportedPlatformVariant.map { " (\($0))" } ?? ""
-            throw XCFrameworkError.message("Unsupported XCFramework platform: \(platform)\(variant)")
+            throw DylibForgeError.message("Unsupported XCFramework platform: \(platform)\(variant)")
         }
     }
 }
@@ -75,7 +75,7 @@ private extension XCFrameworkSDKNameResolver {
         let sdkNames = Set(xcodeSDKs.map(\.platform))
 
         guard !sdkNames.isEmpty else {
-            throw XCFrameworkError.message("xcodebuild -showsdks returned no SDK names")
+            throw DylibForgeError.message("xcodebuild -showsdks returned no SDK names")
         }
         return sdkNames
     }
@@ -90,7 +90,7 @@ private extension XCFrameworkSDKNameResolver {
                 continue
             }
             guard let currentSDK else {
-                throw XCFrameworkError.message("\(name) must start with any or an SDK name, such as iphoneos")
+                throw DylibForgeError.message("\(name) must start with any or an SDK name, such as iphoneos")
             }
             result[currentSDK, default: []].append(value)
         }

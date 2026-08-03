@@ -1,5 +1,5 @@
+import DylibForgeCore
 import Foundation
-import Logging
 import Yams
 
 /// Filters auto-detected framework dependencies that the selected SDK does not allow direct clients to link.
@@ -7,14 +7,14 @@ final class AutolinkFrameworkFilter {
     private let fileManager: FileManager
     private let jsonDecoder: JSONDecoder
     private let yamlDecoder: YAMLDecoder
-    private let logger: Logger
+    private let logger: DylibForgeLogger
 
     /// Creates a filter with an injectable file manager so tests can provide an isolated SDK-like filesystem.
     init(
         fileManager: FileManager = .default,
         jsonDecoder: JSONDecoder = JSONDecoder(),
         yamlDecoder: YAMLDecoder = YAMLDecoder(),
-        logger: Logger = Logger(label: "dylib-forge.autolink-filter"),
+        logger: DylibForgeLogger = DylibForgeLogger(),
     ) {
         self.fileManager = fileManager
         self.jsonDecoder = jsonDecoder

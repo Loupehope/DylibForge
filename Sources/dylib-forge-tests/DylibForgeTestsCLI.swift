@@ -1,7 +1,6 @@
 import ArgumentParser
 import DylibForgeAcceptanceTests
 import DylibForgeCore
-import Logging
 
 /// The command-line entry point for DylibForge's end-to-end acceptance suite.
 @main
@@ -25,10 +24,13 @@ private struct Acceptance: AsyncParsableCommand {
     @Option(help: "Path to an Xcode.app bundle. Defaults to the Xcode selected by xcode-select.")
     var xcodePath: String?
 
+    @Flag(help: "Show logs at all levels.")
+    var verbose = false
+
     /// Runs the entire acceptance workflow with one selected Xcode toolchain.
     mutating func run() async throws {
-        LoggingSystem.bootstrap { ColoredLogHandler.standardError(label: $0) }
-        let logger = Logger(label: "dylib-forge.acceptance")
+        DylibForgeLogger.configure(verbose: verbose)
+        let logger = DylibForgeLogger()
 
         do {
             try await AcceptanceTestRunner.run(xcodePath: xcodePath)

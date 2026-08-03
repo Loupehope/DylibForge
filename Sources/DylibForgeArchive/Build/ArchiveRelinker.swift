@@ -1,10 +1,8 @@
 import DylibForgeCore
 import Foundation
-import Logging
 
 /// Orchestrates relinking a static archive into a dynamic Mach-O binary.
 final class ArchiveRelinker {
-    private let logger: Logger
     private let environment: ToolEnvironment
     private let archiveExtractor: ArchiveExtractor
     private let clangLinker: ClangLinker
@@ -15,17 +13,21 @@ final class ArchiveRelinker {
         archiveExtractor: ArchiveExtractor,
         clangLinker: ClangLinker,
         machoEditor: MachOEditor,
-        logger: Logger = Logger(label: "dylib-forge.build"),
     ) {
         self.environment = environment
         self.archiveExtractor = archiveExtractor
         self.clangLinker = clangLinker
         self.machoEditor = machoEditor
-        self.logger = logger
     }
 
     /// Main CLI entry point.
-    func run(inputPath: String, outputPath: String, sdk: String, installName: String, overrides: RelinkOptions) async throws -> RelinkResult {
+    func run(
+        inputPath: String,
+        outputPath: String,
+        sdk: String,
+        installName: String,
+        overrides: RelinkOptions,
+    ) async throws -> RelinkResult {
         let inputURL = URL(fileURLWithPath: inputPath).standardizedFileURL.resolvingSymlinksInPath()
         let destination = URL(fileURLWithPath: outputPath).standardizedFileURL.resolvingSymlinksInPath()
         let target = try resolveArchive(at: inputURL, sdk: sdk, outputURL: destination)
@@ -51,8 +53,6 @@ private extension ArchiveRelinker {
         overrides: RelinkOptions,
         outputFileURL: URL,
     ) async throws -> RelinkResult {
-        logger.notice("Build started: \(target.inputURL.path)")
-
         // Keep all intermediate slices and unpacked objects in one disposable workspace.
         let temporaryRoot = environment.files.temporaryDirectory.appendingPathComponent("dylib_forge_\(UUID().uuidString)")
         try environment.files.createDirectory(at: temporaryRoot)
@@ -100,7 +100,6 @@ private extension ArchiveRelinker {
             try environment.files.removeItem(at: outputFileURL)
         }
         try environment.files.copyItem(at: mergedBinaryURL, to: outputFileURL)
-        logger.notice("Build finished: \(outputFileURL.path)")
         return RelinkResult(
             linkedArchitectures: slices.architectures.filter { !skippedArchitectures.contains($0) },
             skippedArchitectures: skippedArchitectures,

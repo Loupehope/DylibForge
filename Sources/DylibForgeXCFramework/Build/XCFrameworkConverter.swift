@@ -1,10 +1,10 @@
 import DylibForgeArchive
+import DylibForgeCore
 import Foundation
-import Logging
 
 /// Orchestrates copying an XCFramework and rebuilding its static artifacts.
 final class XCFrameworkConverter {
-    private let logger: Logger
+    private let logger: DylibForgeLogger
     private let files: XCFrameworkFiles
     private let artifactRelinker: XCFrameworkArtifactRelinker
 
@@ -12,7 +12,7 @@ final class XCFrameworkConverter {
     init(
         files: XCFrameworkFiles,
         artifactRelinker: XCFrameworkArtifactRelinker,
-        logger: Logger = Logger(label: "dylib-forge.xcframework"),
+        logger: DylibForgeLogger = DylibForgeLogger(),
     ) {
         self.files = files
         self.artifactRelinker = artifactRelinker
@@ -20,7 +20,11 @@ final class XCFrameworkConverter {
     }
 
     /// Produces a fully copied, unsigned XCFramework with every supported static artifact rebuilt.
-    func run(inputPath: String, outputPath: String, relinkOptions: RelinkOptions) async throws {
+    func run(
+        inputPath: String,
+        outputPath: String,
+        relinkOptions: RelinkOptions,
+    ) async throws {
         let inputURL = URL(fileURLWithPath: inputPath).standardizedFileURL.resolvingSymlinksInPath()
         let outputURL = URL(fileURLWithPath: outputPath).standardizedFileURL.resolvingSymlinksInPath()
         try validateInput(at: inputURL)
@@ -28,7 +32,6 @@ final class XCFrameworkConverter {
         let conversionURL = temporaryOutputURL(for: outputURL)
         defer { try? files.removeItemIfExists(at: conversionURL) }
 
-        logger.notice("Input XCFramework: \(inputURL.path)")
         try files.copyItem(at: inputURL, to: conversionURL)
 
         let manifestURL = conversionURL.appendingPathComponent("Info.plist")
@@ -39,17 +42,18 @@ final class XCFrameworkConverter {
             guard manifest.availableLibraries[index].artifactKind != .other else {
                 continue
             }
+            var library = manifest.availableLibraries[index]
             try await artifactRelinker.relink(
-                &manifest.availableLibraries[index],
+                &library,
                 in: conversionURL,
                 relinkOptions: relinkOptions,
             )
+            manifest.availableLibraries[index] = library
         }
 
         try files.writeManifest(manifest, to: manifestURL)
         try files.removeCodeSignatures(from: conversionURL, libraries: manifest.availableLibraries)
         try files.replaceOutput(at: outputURL, with: conversionURL)
-        logger.notice("Output XCFramework: \(outputURL.path)")
     }
 }
 
@@ -64,10 +68,10 @@ private extension XCFrameworkConverter {
     /// Verifies that the input exists and has the expected XCFramework directory shape.
     func validateInput(at inputURL: URL) throws {
         guard files.fileExists(at: inputURL) else {
-            throw XCFrameworkError.message("Path does not exist: \(inputURL.path)")
+            throw DylibForgeError.message("Path does not exist: \(inputURL.path)")
         }
         guard inputURL.pathExtension == "xcframework", files.isDirectory(at: inputURL) else {
-            throw XCFrameworkError.message("Expected an XCFramework directory: \(inputURL.path)")
+            throw DylibForgeError.message("Expected an XCFramework directory: \(inputURL.path)")
         }
     }
 

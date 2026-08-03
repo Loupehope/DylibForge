@@ -1,23 +1,23 @@
+import DylibForgeCore
 import Foundation
-import Logging
 
 /// Selects the dependency artifact that matches each architecture currently being relinked.
 final class XCFrameworkDependencyResolver {
     private let files: XCFrameworkFiles
     private let dependencyURLs: [URL]
-    private let logger: Logger
+    private let logger: DylibForgeLogger
 
     init(
         paths: [String],
         files: XCFrameworkFiles,
-        logger: Logger = Logger(label: "dylib-forge.xcframework"),
+        logger: DylibForgeLogger = DylibForgeLogger(),
     ) throws {
         self.files = files
         self.logger = logger
         dependencyURLs = try paths.map { path in
             let url = URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath()
             guard url.pathExtension == "xcframework", files.isDirectory(at: url) else {
-                throw XCFrameworkError.message("Expected an XCFramework dependency: \(url.path)")
+                throw DylibForgeError.message("Expected an XCFramework dependency: \(url.path)")
             }
             return url
         }
@@ -29,10 +29,10 @@ final class XCFrameworkDependencyResolver {
             return [:]
         }
         guard !library.supportedArchitectures.isEmpty else {
-            throw XCFrameworkError.message("AvailableLibraries item has no SupportedArchitectures: \(library.identifier)")
+            throw DylibForgeError.message("AvailableLibraries item has no SupportedArchitectures: \(library.identifier)")
         }
         guard Set(library.supportedArchitectures).count == library.supportedArchitectures.count else {
-            throw XCFrameworkError.message("AvailableLibraries item has duplicate SupportedArchitectures: \(library.identifier)")
+            throw DylibForgeError.message("AvailableLibraries item has duplicate SupportedArchitectures: \(library.identifier)")
         }
         let dependencies = try dependencyURLs.map(parseDependency)
         return try Dictionary(uniqueKeysWithValues: library.supportedArchitectures.map { architecture in
@@ -50,7 +50,7 @@ private extension XCFrameworkDependencyResolver {
     func parseDependency(at url: URL) throws -> Dependency {
         let manifestURL = url.appendingPathComponent("Info.plist")
         guard files.fileExists(at: manifestURL) else {
-            throw XCFrameworkError.message("XCFramework dependency has no Info.plist: \(url.path)")
+            throw DylibForgeError.message("XCFramework dependency has no Info.plist: \(url.path)")
         }
         return try Dependency(url: url, manifest: files.readManifest(at: manifestURL))
     }
@@ -81,7 +81,7 @@ private extension XCFrameworkDependencyResolver {
         }
         guard matches.count == 1, let match = matches.first else {
             let target = "\(library.supportedPlatform ?? "unknown")" + (library.supportedPlatformVariant.map { "-\($0)" } ?? "")
-            throw XCFrameworkError.message(
+            throw DylibForgeError.message(
                 "Dependency \(dependency.url.lastPathComponent) has \(matches.isEmpty ? "no" : "multiple") \(target) artifact(s) for \(architecture)",
             )
         }
@@ -99,14 +99,14 @@ private extension XCFrameworkDependencyResolver {
             return URL(fileURLWithPath: library.libraryPath).deletingPathExtension().lastPathComponent
         }
         guard Set(frameworkNames).count == frameworkNames.count else {
-            throw XCFrameworkError.message("Dependencies contain duplicate framework names for \(architecture)")
+            throw DylibForgeError.message("Dependencies contain duplicate framework names for \(architecture)")
         }
     }
 
     func linkerArgs(for library: XCFrameworkLibrary, in xcframeworkURL: URL) throws -> [String] {
         let artifactURL = try library.artifactURL(in: xcframeworkURL)
         guard files.fileExists(at: artifactURL) else {
-            throw XCFrameworkError.message("Dependency artifact does not exist: \(artifactURL.path)")
+            throw DylibForgeError.message("Dependency artifact does not exist: \(artifactURL.path)")
         }
 
         switch library.artifactKind {
@@ -118,7 +118,7 @@ private extension XCFrameworkDependencyResolver {
             return [artifactURL.path]
         case .other:
             guard artifactURL.pathExtension == "dylib" else {
-                throw XCFrameworkError.message("Unsupported XCFramework dependency artifact: \(artifactURL.path)")
+                throw DylibForgeError.message("Unsupported XCFramework dependency artifact: \(artifactURL.path)")
             }
             return [artifactURL.path]
         }

@@ -1,3 +1,4 @@
 [tools]
+"github:nicklockwood/SwiftFormat" = "0.62.1"
 "aqua:yonaskolb/XcodeGen" = "2.46.0"
 "aqua:cpisciotta/xcbeautify" = "3.2.1"

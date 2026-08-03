@@ -1,6 +1,10 @@
 name: Fixtures
 options:
   minimumXcodeGenVersion: 2.38.0
+  deploymentTarget:
+    macOS: "${XCODEGEN_MACOS_DEPLOYMENT_TARGET}"
+    iOS: "${XCODEGEN_IOS_DEPLOYMENT_TARGET}"
+    watchOS: "${XCODEGEN_WATCHOS_DEPLOYMENT_TARGET}"
 configs:
   Debug: debug
   Release: release
@@ -59,27 +63,27 @@ targets:
     templates: [static-framework]
     platform: macOS
     templateAttributes: { fixture: StaticFrameworkWithPrivateObjC }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithPrivateObjC, MACOSX_DEPLOYMENT_TARGET: "15.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithPrivateObjC } }
   StaticFrameworkWithPrivateObjC_iOS:
     templates: [static-framework]
     platform: iOS
     templateAttributes: { fixture: StaticFrameworkWithPrivateObjC }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithPrivateObjC, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithPrivateObjC } }
   StaticFrameworkWithPrivateObjC_iOSSimulator:
     templates: [static-framework]
     platform: iOS
     templateAttributes: { fixture: StaticFrameworkWithPrivateObjC }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithPrivateObjC, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithPrivateObjC } }
   StaticFrameworkWithPrivateObjC_watchOS:
     templates: [static-framework]
     platform: watchOS
     templateAttributes: { fixture: StaticFrameworkWithPrivateObjC }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithPrivateObjC, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithPrivateObjC } }
   StaticFrameworkWithPrivateObjC_watchOSSimulator:
     templates: [static-framework]
     platform: watchOS
     templateAttributes: { fixture: StaticFrameworkWithPrivateObjC }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithPrivateObjC, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithPrivateObjC } }
 
   StaticFrameworkWithCxxDependency_macOS:
     templates: [static-framework]
@@ -92,7 +96,7 @@ targets:
         script: |
           libtool -static -o "$TARGET_TEMP_DIR/merged.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH" "$BUILT_PRODUCTS_DIR/libStaticFrameworkWithCxxStaticDependency.a"
           mv "$TARGET_TEMP_DIR/merged.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH"
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithCxxDependency, MACOSX_DEPLOYMENT_TARGET: "15.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithCxxDependency } }
   StaticFrameworkWithCxxDependency_iOS:
     templates: [static-framework]
     platform: iOS
@@ -104,7 +108,7 @@ targets:
         script: |
           libtool -static -o "$TARGET_TEMP_DIR/merged.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH" "$BUILT_PRODUCTS_DIR/libStaticFrameworkWithCxxStaticDependency.a"
           mv "$TARGET_TEMP_DIR/merged.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH"
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithCxxDependency, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithCxxDependency } }
   StaticFrameworkWithCxxDependency_iOSSimulator:
     templates: [static-framework]
     platform: iOS
@@ -116,7 +120,7 @@ targets:
         script: |
           libtool -static -o "$TARGET_TEMP_DIR/merged.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH" "$BUILT_PRODUCTS_DIR/libStaticFrameworkWithCxxStaticDependency.a"
           mv "$TARGET_TEMP_DIR/merged.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH"
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithCxxDependency, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithCxxDependency } }
   StaticFrameworkWithCxxDependency_watchOS:
     templates: [static-framework]
     platform: watchOS
@@ -128,7 +132,7 @@ targets:
         script: |
           libtool -static -o "$TARGET_TEMP_DIR/merged.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH" "$BUILT_PRODUCTS_DIR/libStaticFrameworkWithCxxStaticDependency.a"
           mv "$TARGET_TEMP_DIR/merged.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH"
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithCxxDependency, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithCxxDependency } }
   StaticFrameworkWithCxxDependency_watchOSSimulator:
     templates: [static-framework]
     platform: watchOS
@@ -140,54 +144,54 @@ targets:
         script: |
           libtool -static -o "$TARGET_TEMP_DIR/merged.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH" "$BUILT_PRODUCTS_DIR/libStaticFrameworkWithCxxStaticDependency.a"
           mv "$TARGET_TEMP_DIR/merged.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH"
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithCxxDependency, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithCxxDependency } }
 
   StaticFrameworkWithCxxStaticDependency_macOS:
     templates: [static-library]
     platform: macOS
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithCxxStaticDependency, MACOSX_DEPLOYMENT_TARGET: "15.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithCxxStaticDependency } }
   StaticFrameworkWithCxxStaticDependency_iOS:
     templates: [static-library]
     platform: iOS
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithCxxStaticDependency, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithCxxStaticDependency } }
   StaticFrameworkWithCxxStaticDependency_iOSSimulator:
     templates: [static-library]
     platform: iOS
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithCxxStaticDependency, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithCxxStaticDependency } }
   StaticFrameworkWithCxxStaticDependency_watchOS:
     templates: [static-library]
     platform: watchOS
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithCxxStaticDependency, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithCxxStaticDependency } }
   StaticFrameworkWithCxxStaticDependency_watchOSSimulator:
     templates: [static-library]
     platform: watchOS
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithCxxStaticDependency, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithCxxStaticDependency } }
 
   StaticFrameworkWithDuplicateSymbols_macOS:
     templates: [static-framework]
     platform: macOS
     templateAttributes: { fixture: StaticFrameworkWithDuplicateSymbols }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateSymbols, MACOSX_DEPLOYMENT_TARGET: "15.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateSymbols } }
   StaticFrameworkWithDuplicateSymbols_iOS:
     templates: [static-framework]
     platform: iOS
     templateAttributes: { fixture: StaticFrameworkWithDuplicateSymbols }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateSymbols, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateSymbols } }
   StaticFrameworkWithDuplicateSymbols_iOSSimulator:
     templates: [static-framework]
     platform: iOS
     templateAttributes: { fixture: StaticFrameworkWithDuplicateSymbols }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateSymbols, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateSymbols } }
   StaticFrameworkWithDuplicateSymbols_watchOS:
     templates: [static-framework]
     platform: watchOS
     templateAttributes: { fixture: StaticFrameworkWithDuplicateSymbols }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateSymbols, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateSymbols } }
   StaticFrameworkWithDuplicateSymbols_watchOSSimulator:
     templates: [static-framework]
     platform: watchOS
     templateAttributes: { fixture: StaticFrameworkWithDuplicateSymbols }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateSymbols, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateSymbols } }
 
   StaticFrameworkWithDuplicateObjects_macOS:
     templates: [static-framework]
@@ -200,7 +204,7 @@ targets:
           object_file="$(find "$OBJECT_FILE_DIR_normal" -name RepeatedObject.o -print -quit)"
           libtool -static -o "$TARGET_TEMP_DIR/duplicated.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH" "$object_file"
           mv "$TARGET_TEMP_DIR/duplicated.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH"
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateObjects, MACOSX_DEPLOYMENT_TARGET: "15.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateObjects } }
   StaticFrameworkWithDuplicateObjects_iOS:
     templates: [static-framework]
     platform: iOS
@@ -212,7 +216,7 @@ targets:
           object_file="$(find "$OBJECT_FILE_DIR_normal" -name RepeatedObject.o -print -quit)"
           libtool -static -o "$TARGET_TEMP_DIR/duplicated.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH" "$object_file"
           mv "$TARGET_TEMP_DIR/duplicated.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH"
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateObjects, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateObjects } }
   StaticFrameworkWithDuplicateObjects_iOSSimulator:
     templates: [static-framework]
     platform: iOS
@@ -224,7 +228,7 @@ targets:
           object_file="$(find "$OBJECT_FILE_DIR_normal" -name RepeatedObject.o -print -quit)"
           libtool -static -o "$TARGET_TEMP_DIR/duplicated.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH" "$object_file"
           mv "$TARGET_TEMP_DIR/duplicated.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH"
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateObjects, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateObjects } }
   StaticFrameworkWithDuplicateObjects_watchOS:
     templates: [static-framework]
     platform: watchOS
@@ -236,7 +240,7 @@ targets:
           object_file="$(find "$OBJECT_FILE_DIR_normal" -name RepeatedObject.o -print -quit)"
           libtool -static -o "$TARGET_TEMP_DIR/duplicated.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH" "$object_file"
           mv "$TARGET_TEMP_DIR/duplicated.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH"
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateObjects, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateObjects } }
   StaticFrameworkWithDuplicateObjects_watchOSSimulator:
     templates: [static-framework]
     platform: watchOS
@@ -248,191 +252,191 @@ targets:
           object_file="$(find "$OBJECT_FILE_DIR_normal" -name RepeatedObject.o -print -quit)"
           libtool -static -o "$TARGET_TEMP_DIR/duplicated.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH" "$object_file"
           mv "$TARGET_TEMP_DIR/duplicated.a" "$TARGET_BUILD_DIR/$EXECUTABLE_PATH"
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateObjects, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithDuplicateObjects } }
 
   StaticFrameworkWithExcludedObject_macOS:
     templates: [static-framework]
     platform: macOS
     templateAttributes: { fixture: StaticFrameworkWithExcludedObject }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithExcludedObject, MACOSX_DEPLOYMENT_TARGET: "15.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithExcludedObject } }
   StaticFrameworkWithExcludedObject_iOS:
     templates: [static-framework]
     platform: iOS
     templateAttributes: { fixture: StaticFrameworkWithExcludedObject }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithExcludedObject, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithExcludedObject } }
   StaticFrameworkWithExcludedObject_iOSSimulator:
     templates: [static-framework]
     platform: iOS
     templateAttributes: { fixture: StaticFrameworkWithExcludedObject }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithExcludedObject, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithExcludedObject } }
   StaticFrameworkWithExcludedObject_watchOS:
     templates: [static-framework]
     platform: watchOS
     templateAttributes: { fixture: StaticFrameworkWithExcludedObject }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithExcludedObject, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithExcludedObject } }
   StaticFrameworkWithExcludedObject_watchOSSimulator:
     templates: [static-framework]
     platform: watchOS
     templateAttributes: { fixture: StaticFrameworkWithExcludedObject }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithExcludedObject, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithExcludedObject } }
 
   StaticFrameworkWithSwift_macOS:
     templates: [static-framework]
     platform: macOS
     templateAttributes: { fixture: StaticFrameworkWithSwift }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwift, MACOSX_DEPLOYMENT_TARGET: "15.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwift } }
   StaticFrameworkWithSwift_iOS:
     templates: [static-framework]
     platform: iOS
     templateAttributes: { fixture: StaticFrameworkWithSwift }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwift, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwift } }
   StaticFrameworkWithSwift_iOSSimulator:
     templates: [static-framework]
     platform: iOS
     templateAttributes: { fixture: StaticFrameworkWithSwift }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwift, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwift } }
   StaticFrameworkWithSwift_watchOS:
     templates: [static-framework]
     platform: watchOS
     templateAttributes: { fixture: StaticFrameworkWithSwift }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwift, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwift } }
   StaticFrameworkWithSwift_watchOSSimulator:
     templates: [static-framework]
     platform: watchOS
     templateAttributes: { fixture: StaticFrameworkWithSwift }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwift, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwift } }
 
   StaticLibraryWithSwift_macOS:
     templates: [static-swift-library]
     platform: macOS
     templateAttributes: { fixture: StaticLibraryWithSwift }
-    settings: { base: { PRODUCT_NAME: StaticLibraryWithSwift, MACOSX_DEPLOYMENT_TARGET: "15.0" } }
+    settings: { base: { PRODUCT_NAME: StaticLibraryWithSwift } }
   StaticLibraryWithSwift_iOS:
     templates: [static-swift-library]
     platform: iOS
     templateAttributes: { fixture: StaticLibraryWithSwift }
-    settings: { base: { PRODUCT_NAME: StaticLibraryWithSwift, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+    settings: { base: { PRODUCT_NAME: StaticLibraryWithSwift } }
   StaticLibraryWithSwift_iOSSimulator:
     templates: [static-swift-library]
     platform: iOS
     templateAttributes: { fixture: StaticLibraryWithSwift }
-    settings: { base: { PRODUCT_NAME: StaticLibraryWithSwift, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+    settings: { base: { PRODUCT_NAME: StaticLibraryWithSwift } }
   StaticLibraryWithSwift_watchOS:
     templates: [static-swift-library]
     platform: watchOS
     templateAttributes: { fixture: StaticLibraryWithSwift }
-    settings: { base: { PRODUCT_NAME: StaticLibraryWithSwift, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+    settings: { base: { PRODUCT_NAME: StaticLibraryWithSwift } }
   StaticLibraryWithSwift_watchOSSimulator:
     templates: [static-swift-library]
     platform: watchOS
     templateAttributes: { fixture: StaticLibraryWithSwift }
-    settings: { base: { PRODUCT_NAME: StaticLibraryWithSwift, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+    settings: { base: { PRODUCT_NAME: StaticLibraryWithSwift } }
 
   StaticFrameworkWithObjC_macOS:
     templates: [static-framework]
     platform: macOS
     templateAttributes: { fixture: StaticFrameworkWithObjC }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithObjC, MACOSX_DEPLOYMENT_TARGET: "15.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithObjC } }
   StaticFrameworkWithObjC_iOS:
     templates: [static-framework]
     platform: iOS
     templateAttributes: { fixture: StaticFrameworkWithObjC }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithObjC, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithObjC } }
   StaticFrameworkWithObjC_iOSSimulator:
     templates: [static-framework]
     platform: iOS
     templateAttributes: { fixture: StaticFrameworkWithObjC }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithObjC, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithObjC } }
   StaticFrameworkWithObjC_watchOS:
     templates: [static-framework]
     platform: watchOS
     templateAttributes: { fixture: StaticFrameworkWithObjC }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithObjC, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithObjC } }
   StaticFrameworkWithObjC_watchOSSimulator:
     templates: [static-framework]
     platform: watchOS
     templateAttributes: { fixture: StaticFrameworkWithObjC }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithObjC, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithObjC } }
 
   StaticFrameworkWithObjCAndSwift_macOS:
     templates: [static-framework]
     platform: macOS
     templateAttributes: { fixture: StaticFrameworkWithObjCAndSwift }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithObjCAndSwift, MACOSX_DEPLOYMENT_TARGET: "15.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithObjCAndSwift } }
   StaticFrameworkWithObjCAndSwift_iOS:
     templates: [static-framework]
     platform: iOS
     templateAttributes: { fixture: StaticFrameworkWithObjCAndSwift }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithObjCAndSwift, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithObjCAndSwift } }
   StaticFrameworkWithObjCAndSwift_iOSSimulator:
     templates: [static-framework]
     platform: iOS
     templateAttributes: { fixture: StaticFrameworkWithObjCAndSwift }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithObjCAndSwift, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithObjCAndSwift } }
   StaticFrameworkWithObjCAndSwift_watchOS:
     templates: [static-framework]
     platform: watchOS
     templateAttributes: { fixture: StaticFrameworkWithObjCAndSwift }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithObjCAndSwift, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithObjCAndSwift } }
   StaticFrameworkWithObjCAndSwift_watchOSSimulator:
     templates: [static-framework]
     platform: watchOS
     templateAttributes: { fixture: StaticFrameworkWithObjCAndSwift }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithObjCAndSwift, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithObjCAndSwift } }
 
   StaticFrameworkWithSwiftDependency_macOS:
     templates: [static-framework]
     platform: macOS
     templateAttributes: { fixture: StaticFrameworkWithSwiftXCFrameworkDependency/Dependency }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwiftDependency, MACOSX_DEPLOYMENT_TARGET: "15.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwiftDependency } }
   StaticFrameworkWithSwiftDependency_iOS:
     templates: [static-framework]
     platform: iOS
     templateAttributes: { fixture: StaticFrameworkWithSwiftXCFrameworkDependency/Dependency }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwiftDependency, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwiftDependency } }
   StaticFrameworkWithSwiftDependency_iOSSimulator:
     templates: [static-framework]
     platform: iOS
     templateAttributes: { fixture: StaticFrameworkWithSwiftXCFrameworkDependency/Dependency }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwiftDependency, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwiftDependency } }
   StaticFrameworkWithSwiftDependency_watchOS:
     templates: [static-framework]
     platform: watchOS
     templateAttributes: { fixture: StaticFrameworkWithSwiftXCFrameworkDependency/Dependency }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwiftDependency, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwiftDependency } }
   StaticFrameworkWithSwiftDependency_watchOSSimulator:
     templates: [static-framework]
     platform: watchOS
     templateAttributes: { fixture: StaticFrameworkWithSwiftXCFrameworkDependency/Dependency }
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwiftDependency, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwiftDependency } }
 
   StaticFrameworkWithSwiftDependentFramework_macOS:
     templates: [static-framework]
     platform: macOS
     templateAttributes: { fixture: StaticFrameworkWithSwiftXCFrameworkDependency/DependentFramework }
     dependencies: [{ target: StaticFrameworkWithSwiftDependency_macOS }]
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwiftDependentFramework, MACOSX_DEPLOYMENT_TARGET: "15.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwiftDependentFramework } }
   StaticFrameworkWithSwiftDependentFramework_iOS:
     templates: [static-framework]
     platform: iOS
     templateAttributes: { fixture: StaticFrameworkWithSwiftXCFrameworkDependency/DependentFramework }
     dependencies: [{ target: StaticFrameworkWithSwiftDependency_iOS }]
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwiftDependentFramework, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwiftDependentFramework } }
   StaticFrameworkWithSwiftDependentFramework_iOSSimulator:
     templates: [static-framework]
     platform: iOS
     templateAttributes: { fixture: StaticFrameworkWithSwiftXCFrameworkDependency/DependentFramework }
     dependencies: [{ target: StaticFrameworkWithSwiftDependency_iOSSimulator }]
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwiftDependentFramework, IPHONEOS_DEPLOYMENT_TARGET: "16.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwiftDependentFramework } }
   StaticFrameworkWithSwiftDependentFramework_watchOS:
     templates: [static-framework]
     platform: watchOS
     templateAttributes: { fixture: StaticFrameworkWithSwiftXCFrameworkDependency/DependentFramework }
     dependencies: [{ target: StaticFrameworkWithSwiftDependency_watchOS }]
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwiftDependentFramework, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwiftDependentFramework } }
   StaticFrameworkWithSwiftDependentFramework_watchOSSimulator:
     templates: [static-framework]
     platform: watchOS
     templateAttributes: { fixture: StaticFrameworkWithSwiftXCFrameworkDependency/DependentFramework }
     dependencies: [{ target: StaticFrameworkWithSwiftDependency_watchOSSimulator }]
-    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwiftDependentFramework, WATCHOS_DEPLOYMENT_TARGET: "9.0" } }
+    settings: { base: { PRODUCT_NAME: StaticFrameworkWithSwiftDependentFramework } }

@@ -1,7 +1,6 @@
 import ArgumentParser
 import DylibForgeCore
 import Foundation
-import Logging
 
 /// Runs the acceptance pipeline from generated fixture source through client runtime validation.
 ///
@@ -12,7 +11,8 @@ final class AcceptanceSuite: Sendable {
     private let acceptanceDirectory: URL
     private let repositoryDirectory: URL
     private let buildDirectory: URL
-    private let logger: Logger
+    private let deploymentTargetsProvider: DeploymentTargetsProvider
+    private let logger: DylibForgeLogger
     private let shell: CommandExecutor
     private let developerDirectory: String
 
@@ -23,10 +23,14 @@ final class AcceptanceSuite: Sendable {
     /// - Parameter xcodePath: An optional Xcode developer directory; the current `xcode-select` value is
     ///   used when this is `nil`.
     init(xcodePath: String?) async throws {
-        logger = Logger(label: "dylib-forge.acceptance")
+        logger = DylibForgeLogger()
         repositoryDirectory = try await Self.locateRepositoryDirectory(using: DefaultCommandExecutor(logger: logger))
         acceptanceDirectory = repositoryDirectory.appendingPathComponent("AcceptanceTests", isDirectory: true)
         buildDirectory = acceptanceDirectory.appendingPathComponent(".build", isDirectory: true)
+        deploymentTargetsProvider = try DeploymentTargetsProvider(
+            fileURL: acceptanceDirectory.appendingPathComponent("deployment-targets.json"),
+            fileManager: fileManager,
+        )
         developerDirectory = try await XcodePathProvider(commandExecutor: DefaultCommandExecutor(logger: logger))
             .developerDirectory(for: xcodePath)
         shell = DeveloperCommandExecutor(developerDirectory: developerDirectory, logger: logger)
@@ -47,49 +51,45 @@ final class AcceptanceSuite: Sendable {
 
     /// Builds the `dylib-forge` executable consumed by the relinking stage.
     func buildDylibForge() async throws {
-        logger.notice("Building dylib-forge")
         _ = try await shell.run([
             "swift", "build", "--package-path", repositoryDirectory.path, "--product", "dylib-forge",
         ])
-        logger.notice("Built dylib-forge")
     }
 
     /// Generates the fixtures Xcode project and builds every platform slice.
     ///
-    /// Each fixture's slices are archived concurrently, then combined into one static XCFramework that is
-    /// used as input by the relinking stage.
+    /// Builds each fixture and combines its platform slices into one static XCFramework used by relinking.
     func buildFixtures() async throws {
-        logger.notice("Generating the fixtures Xcode project")
         try await runXcodeGen(
             spec: fixturesProjectDirectory.appendingPathComponent("project.yml"),
             projectDirectory: fixturesProjectDirectory,
         )
 
-        for fixture in Fixture.allCases {
-            logger.notice("Building static fixture \(fixture.rawValue)")
-            let frameworkURLs = try await archiveFrameworks(for: fixture)
+        for stage in try fixtureStages() {
+            try await stage.concurrentForEach { [weak self] fixture in
+                guard let self else { return }
+                let frameworkURLs = try await archiveFrameworks(for: fixture)
 
-            let outputURL = staticDirectory.appendingPathComponent("\(fixture.rawValue).xcframework")
-            try removeIfPresent(outputURL)
-            logger.notice("Creating static XCFramework \(fixture.rawValue)")
-            var arguments = [
-                "xcodebuild",
-                "-create-xcframework",
-            ]
-            for frameworkURL in frameworkURLs {
-                arguments += [fixture.archiveProduct.xcodebuildArgument, frameworkURL.path]
+                let outputURL = staticDirectory.appendingPathComponent("\(fixture.rawValue).xcframework")
+                try removeIfPresent(outputURL)
+                var arguments = [
+                    "xcodebuild",
+                    "-create-xcframework",
+                ]
+                for frameworkURL in frameworkURLs {
+                    arguments += [fixture.archiveProduct.xcodebuildArgument, frameworkURL.path]
+                }
+                arguments += ["-output", outputURL.path]
+                _ = try await shell.run(arguments.xcbeautified)
             }
-            arguments += ["-output", outputURL.path]
-            _ = try await shell.run(arguments.xcbeautified)
         }
     }
 
     /// Relinks each static fixture XCFramework with the locally built DylibForge executable.
     ///
-    /// Fixtures without XCFramework dependencies run concurrently. Dependent fixtures run after their
-    /// relinked dependencies have been produced.
+    /// Fixtures run in dependency stages: every fixture in a stage has all of its relinked XCFramework
+    /// dependencies produced by earlier stages.
     func relinkFixtures() async throws {
-        logger.notice("Relinking fixture XCFrameworks")
         try fileManager.createDirectory(at: relinkedDirectory, withIntermediateDirectories: true)
         let forgeExecutable = repositoryDirectory.appendingPathComponent(".build/debug/dylib-forge").path
 
@@ -99,56 +99,70 @@ final class AcceptanceSuite: Sendable {
             )
         }
 
-        let independentFixtures = Fixture.allCases.filter(\.xcframeworkDependencies.isEmpty)
-        _ = try await independentFixtures.concurrentMap { [weak self] fixture in
-            guard let self else { throw CancellationError() }
-            try await relink(fixture, using: forgeExecutable)
-        }
-
-        for fixture in Fixture.allCases where !fixture.xcframeworkDependencies.isEmpty {
-            try await relink(fixture, using: forgeExecutable)
+        for stage in try fixtureStages() {
+            try await stage.concurrentForEach { [weak self] fixture in
+                guard let self else { return }
+                try await relink(fixture, using: forgeExecutable)
+            }
         }
     }
 
-    /// Builds and launches the macOS client, then runs the Swift Testing bundles on simulators.
-    ///
-    /// The macOS client runs as a child process, so a dyld failure is reported immediately through its exit
-    /// status without terminating the acceptance command itself.
+    /// Runs generated Swift Testing bundles and rejects duplicate-symbol diagnostics in every build log.
     func buildAndRunClient() async throws {
-        logger.notice("Generating the acceptance client Xcode project")
         try await runXcodeGen(
             spec: clientProjectDirectory.appendingPathComponent("project.yml"),
             projectDirectory: clientProjectDirectory,
         )
-        logger.notice("Building the macOS acceptance client")
-        let buildResult = try await shell.run([
-            "xcodebuild",
-            "build", "-project",
-            clientProjectDirectory.appendingPathComponent("AcceptanceClient.xcodeproj").path,
-            "-scheme", "AcceptanceClient", "-configuration", "Debug",
-            "-destination", "platform=macOS,arch=arm64", "-derivedDataPath",
-            clientDerivedDataDirectory.path,
-            "CODE_SIGNING_ALLOWED=YES", "CODE_SIGN_IDENTITY=-",
-        ].xcbeautified)
-        try validateNoDuplicateSymbolDiagnostics(in: buildResult, logFileName: "client-build.log")
-
-        logger.notice("Running the macOS acceptance client")
-        _ = try await shell.run([clientExecutable.path])
-        try await runSimulatorTests()
-
-        logger.notice("Acceptance tests passed")
+        let simulatorTestConfigurations = try await simulatorTestConfigurations()
+        for configuration in simulatorTestConfigurations {
+            _ = try await shell.run(["xcrun", "simctl", "bootstatus", configuration.udid, "-b"])
+        }
+        let testConfigurations = [
+            (scheme: "AcceptanceMacOSTests", destination: "platform=macOS,arch=arm64"),
+        ] + simulatorTestConfigurations.map { (scheme: $0.scheme, destination: $0.destination) }
+        try await testConfigurations.concurrentForEach { [weak self] configuration in
+            guard let self else { return }
+            try await runClientTests(scheme: configuration.scheme, destination: configuration.destination)
+        }
     }
 }
 
 private extension AcceptanceSuite {
+    /// Splits fixtures into topological dependency stages for building and relinking.
+    func fixtureStages() throws -> [[Fixture]] {
+        var remainingFixtures = Fixture.allCases
+        var completedFixtureNames = Set<String>()
+        var stages: [[Fixture]] = []
+
+        while !remainingFixtures.isEmpty {
+            let stage = remainingFixtures.filter { fixture in
+                fixture.xcframeworkDependencies.allSatisfy { dependency in
+                    completedFixtureNames.contains(dependency.rawValue)
+                }
+            }
+
+            guard !stage.isEmpty else {
+                let unresolvedFixtures = remainingFixtures.map(\.rawValue).joined(separator: ", ")
+                throw ValidationError(
+                    "Could not resolve fixture dependencies. Remaining fixtures: \(unresolvedFixtures).",
+                )
+            }
+
+            stages.append(stage)
+            completedFixtureNames.formUnion(stage.map(\.rawValue))
+            let stageNames = Set(stage.map(\.rawValue))
+            remainingFixtures.removeAll { stageNames.contains($0.rawValue) }
+        }
+
+        return stages
+    }
+
     /// Archives every device and simulator slice for one fixture and returns framework URLs in platform order.
     ///
-    /// The concurrent map limits active `xcodebuild archive` processes to the number of available processor
-    /// cores while preserving `Platform.allCases` order for `xcodebuild -create-xcframework`.
+    /// Runs slices in order because the enclosing fixture map already limits active Xcode builds by CPU count.
     func archiveFrameworks(for fixture: Fixture) async throws -> [URL] {
-        try await Platform.allCases.concurrentMap { [weak self] platform in
-            guard let self else { throw CancellationError() }
-            logger.info("Archiving \(fixture.rawValue) for \(platform.rawValue)")
+        var frameworkURLs: [URL] = []
+        for platform in Platform.allCases {
             let archiveURL = archivesDirectory.appendingPathComponent("\(fixture.rawValue)-\(platform.rawValue).xcarchive")
             let derivedDataURL = fixtureDerivedDataDirectory(for: fixture, platform: platform)
 
@@ -161,13 +175,13 @@ private extension AcceptanceSuite {
                 "-archivePath", archiveURL.path, "-derivedDataPath", derivedDataURL.path,
                 "-quiet", "CODE_SIGNING_ALLOWED=NO",
             ].xcbeautified)
-            return archiveURL.appendingPathComponent(fixture.archiveProduct.path(for: fixture))
+            frameworkURLs.append(archiveURL.appendingPathComponent(fixture.archiveProduct.path(for: fixture)))
         }
+        return frameworkURLs
     }
 
     /// Converts one static fixture XCFramework and supplies its already-converted XCFramework dependencies.
     func relink(_ fixture: Fixture, using forgeExecutable: String) async throws {
-        logger.info("Relinking \(fixture.rawValue)")
         let inputURL = staticDirectory.appendingPathComponent("\(fixture.rawValue).xcframework")
         let outputURL = relinkedDirectory.appendingPathComponent("\(fixture.rawValue).xcframework")
         try removeIfPresent(outputURL)
@@ -177,32 +191,44 @@ private extension AcceptanceSuite {
                 inputURL.path,
                 "--output", outputURL.path,
                 "--xcode-path", developerDirectory,
-            ] + Platform.allCases.flatMap(\.relinkingArguments)
-            + fixture.xcframeworkDependencies.flatMap { dependency in
+            ] + fixture.xcframeworkDependencies.flatMap { dependency in
                 [
                     "--xcframework-dependency",
                     relinkedDirectory.appendingPathComponent("\(dependency.rawValue).xcframework").path,
                 ]
             }
+            + deploymentTargetsProvider.linkerArguments
             + fixture.relinkingArguments
-        _ = try await shell.run([forgeExecutable] + arguments, logging: .disabled)
+        _ = try await shell.run([forgeExecutable] + arguments)
     }
 
-    /// Runs the shared fixture validation Swift Testing bundle on the newest available iOS and watchOS simulators.
+    /// Resolves the newest iOS and watchOS simulator destinations supported by the selected Xcode SDKs.
     ///
-    /// Each `xcodebuild test` result is persisted and examined for duplicate-symbol linker diagnostics.
-    func runSimulatorTests() async throws {
+    /// The returned UDIDs allow the caller to finish booting the selected simulators before running their
+    /// test schemes in parallel.
+    func simulatorTestConfigurations() async throws -> [(scheme: String, destination: String, udid: String)] {
         let simulatorListOutput = try await shell.run([
             "xcrun", "simctl", "list", "devices", "available", "--json",
         ]).stdout
         let simulatorList = try JSONDecoder().decode(SimulatorList.self, from: Data(simulatorListOutput.utf8))
 
+        var configurations: [(scheme: String, destination: String, udid: String)] = []
         for platform in SimulatorPlatform.allCases {
-            let destination = try simulatorList.destination(for: platform)
-            logger.notice("Running acceptance tests on \(platform.xcodeDestinationPlatform)")
-
-            try await runClientTests(scheme: platform.testScheme, destination: destination)
+            let sdkPlatformVersion = try await shell.run([
+                "xcrun", "--sdk", platform.simulatorSDK, "--show-sdk-platform-version",
+            ]).stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+            let device = try simulatorList.device(
+                for: platform,
+                minimumDeploymentTarget: deploymentTargetsProvider.minimumVersion(for: platform),
+                maximumSDKPlatformVersion: sdkPlatformVersion,
+            )
+            configurations.append((
+                scheme: platform.testScheme,
+                destination: "platform=\(platform.xcodeDestinationPlatform),id=\(device.udid)",
+                udid: device.udid,
+            ))
         }
+        return configurations
     }
 
     /// Runs one client Swift Testing scheme and persists its build-and-test log for diagnostic validation.
@@ -212,7 +238,7 @@ private extension AcceptanceSuite {
             "test", "-project",
             clientProjectDirectory.appendingPathComponent("AcceptanceClient.xcodeproj").path,
             "-scheme", scheme, "-configuration", "Debug",
-            "-destination", destination, "-derivedDataPath", clientDerivedDataDirectory.path,
+            "-destination", destination, "-derivedDataPath", clientDerivedDataDirectory(for: scheme).path,
             "-test-timeouts-enabled", "YES",
             "-default-test-execution-time-allowance", "30",
             "-maximum-test-execution-time-allowance", "30",
@@ -267,7 +293,7 @@ private extension AcceptanceSuite {
         buildDirectory.appendingPathComponent("Archives", isDirectory: true)
     }
 
-    /// Returns an isolated DerivedData directory so concurrent fixture archives cannot share build state.
+    /// Returns an isolated DerivedData directory for one fixture archive.
     func fixtureDerivedDataDirectory(for fixture: Fixture, platform: Platform) -> URL {
         buildDirectory.appendingPathComponent(
             "FixtureDerivedData/\(fixture.rawValue)-\(platform.rawValue)",
@@ -285,26 +311,24 @@ private extension AcceptanceSuite {
         buildDirectory.appendingPathComponent("Relinked", isDirectory: true)
     }
 
-    /// Derived data shared by the macOS client build and simulator test runs.
-    var clientDerivedDataDirectory: URL {
-        buildDirectory.appendingPathComponent("ClientDerivedData", isDirectory: true)
+    /// Returns the DerivedData directory for one test scheme.
+    func clientDerivedDataDirectory(for scheme: String) -> URL {
+        buildDirectory.appendingPathComponent("ClientDerivedData/\(scheme)", isDirectory: true)
     }
 
-    /// The executable produced by the generated macOS client project.
-    var clientExecutable: URL {
-        clientDerivedDataDirectory.appendingPathComponent(
-            "Build/Products/Debug/AcceptanceClient.app/Contents/MacOS/AcceptanceClient",
-        )
-    }
-
-    /// Generates an Xcode project with an explicit XcodeGen override or mise's root tool configuration.
+    /// Generates an Xcode project with shared deployment targets and mise's root XcodeGen configuration.
     ///
     /// `XCODEGEN` is useful for local development; CI and normal usage resolve the pinned XcodeGen version
     /// through the root `mise.toml` file.
     func runXcodeGen(spec: URL, projectDirectory: URL) async throws {
+        let environmentAssignments = deploymentTargetsProvider.xcodeGenEnvironment
+            .sorted { $0.key < $1.key }
+            .map { "\($0.key)=\($0.value)" }
         let arguments = ["generate", "--spec", spec.path, "--project", projectDirectory.path]
 
-        _ = try await shell.run(["mise", "-C", repositoryDirectory.path, "exec", "--", "xcodegen"] + arguments)
+        _ = try await shell.run(
+            ["env"] + environmentAssignments + ["mise", "-C", repositoryDirectory.path, "exec", "--", "xcodegen"] + arguments,
+        )
     }
 
     /// Deletes a generated artifact only when it already exists.

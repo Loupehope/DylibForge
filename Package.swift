@@ -19,16 +19,13 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", exact: "1.8.2"),
-        .package(url: "https://github.com/apple/swift-log.git", exact: "1.14.0"),
         .package(url: "https://github.com/swiftlang/swift-subprocess.git", exact: "1.0.0-beta.1"),
-        .package(url: "https://github.com/nicklockwood/SwiftFormat", exact: "0.62.1"),
         .package(url: "https://github.com/jpsim/Yams.git", exact: "6.2.2"),
     ],
     targets: [
         .target(
             name: "DylibForgeCore",
             dependencies: [
-                .product(name: "Logging", package: "swift-log"),
                 .product(name: "Subprocess", package: "swift-subprocess"),
             ],
         ),
@@ -36,7 +33,6 @@ let package = Package(
             name: "DylibForgeArchive",
             dependencies: [
                 "DylibForgeCore",
-                .product(name: "Logging", package: "swift-log"),
                 .product(name: "Yams", package: "Yams"),
             ],
         ),
@@ -45,7 +41,6 @@ let package = Package(
             dependencies: [
                 "DylibForgeCore",
                 "DylibForgeArchive",
-                .product(name: "Logging", package: "swift-log"),
             ],
         ),
         .executableTarget(
@@ -55,7 +50,6 @@ let package = Package(
                 "DylibForgeCore",
                 "DylibForgeXCFramework",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
-                .product(name: "Logging", package: "swift-log"),
             ],
         ),
         .target(
@@ -63,7 +57,6 @@ let package = Package(
             dependencies: [
                 "DylibForgeCore",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
-                .product(name: "Logging", package: "swift-log"),
             ],
         ),
         .executableTarget(
@@ -72,7 +65,6 @@ let package = Package(
                 "DylibForgeAcceptanceTests",
                 "DylibForgeCore",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
-                .product(name: "Logging", package: "swift-log"),
             ],
         ),
     ],

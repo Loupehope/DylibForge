@@ -1,3 +1,4 @@
+import DylibForgeCore
 import Foundation
 
 /// Root XCFramework property list while preserving every field not owned by this tool.
@@ -10,7 +11,7 @@ struct XCFrameworkManifest {
     /// Validates and wraps the decoded root property-list dictionary.
     init(propertyList: [String: Any]) throws {
         guard let rawLibraries = propertyList["AvailableLibraries"] as? [[String: Any]] else {
-            throw XCFrameworkError.message("XCFramework Info.plist has no AvailableLibraries array")
+            throw DylibForgeError.message("XCFramework Info.plist has no AvailableLibraries array")
         }
         rawPropertyList = propertyList
         availableLibraries = try rawLibraries.map(XCFrameworkLibrary.init)
@@ -61,7 +62,7 @@ struct XCFrameworkLibrary {
               !identifier.isEmpty,
               !libraryPath.isEmpty
         else {
-            throw XCFrameworkError.message("Each AvailableLibraries item must contain LibraryIdentifier and LibraryPath")
+            throw DylibForgeError.message("Each AvailableLibraries item must contain LibraryIdentifier and LibraryPath")
         }
         rawPropertyList = propertyList
         self.identifier = identifier
@@ -130,7 +131,7 @@ struct XCFrameworkBundleInfo {
     /// Extracts the executable and optional Xcode platform name from a framework `Info.plist`.
     init(propertyList: [String: Any], frameworkURL: URL) throws {
         guard let executableName = propertyList["CFBundleExecutable"] as? String, !executableName.isEmpty else {
-            throw XCFrameworkError.message("Framework Info.plist has no CFBundleExecutable: \(frameworkURL.path)")
+            throw DylibForgeError.message("Framework Info.plist has no CFBundleExecutable: \(frameworkURL.path)")
         }
         self.executableName = executableName
         platformName = propertyList["DTPlatformName"] as? String

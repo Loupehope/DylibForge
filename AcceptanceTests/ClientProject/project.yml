@@ -1,20 +1,30 @@
 name: AcceptanceClient
 options:
   minimumXcodeGenVersion: 2.38.0
+  deploymentTarget:
+    macOS: "${XCODEGEN_MACOS_DEPLOYMENT_TARGET}"
+    iOS: "${XCODEGEN_IOS_DEPLOYMENT_TARGET}"
+    watchOS: "${XCODEGEN_WATCHOS_DEPLOYMENT_TARGET}"
 settings:
   base:
-    MACOSX_DEPLOYMENT_TARGET: "15.0"
     GENERATE_INFOPLIST_FILE: YES
     PRODUCT_BUNDLE_IDENTIFIER: com.dylibforge.acceptance.client
     CODE_SIGN_IDENTITY: "-"
     EXTRACT_APPINTENTS_METADATA: NO
 targets:
-  AcceptanceClient:
-    type: application
+  AcceptanceMacOSTests:
+    type: bundle.unit-test
     platform: macOS
-    scheme: {}
+    scheme:
+      testTargets:
+        - AcceptanceMacOSTests
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.dylibforge.acceptance.macos-tests
+        EXTRACT_APPINTENTS_METADATA: NO
     sources:
-      - path: Sources
+      - path: Tests
       - path: Validation/Sources
     dependencies:
       - framework: ../.build/Relinked/StaticFrameworkWithPrivateObjC.xcframework
@@ -48,7 +58,6 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
-        IPHONEOS_DEPLOYMENT_TARGET: "16.0"
         PRODUCT_BUNDLE_IDENTIFIER: com.dylibforge.acceptance.ios-tests
         EXTRACT_APPINTENTS_METADATA: NO
     sources:
@@ -86,7 +95,6 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
-        WATCHOS_DEPLOYMENT_TARGET: "9.0"
         PRODUCT_BUNDLE_IDENTIFIER: com.dylibforge.acceptance.watchos-tests
         EXTRACT_APPINTENTS_METADATA: NO
     sources:

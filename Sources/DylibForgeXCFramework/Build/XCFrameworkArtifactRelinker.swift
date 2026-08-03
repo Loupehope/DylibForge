@@ -1,4 +1,5 @@
 import DylibForgeArchive
+import DylibForgeCore
 import Foundation
 
 /// Rebuilds one XCFramework artifact using the core archive relinker.
@@ -69,7 +70,7 @@ private extension XCFrameworkArtifactRelinker {
         relinkOptions: RelinkOptions,
     ) async throws {
         guard files.fileExists(at: archiveURL) else {
-            throw XCFrameworkError.message("Static archive does not exist: \(archiveURL.path)")
+            throw DylibForgeError.message("Static archive does not exist: \(archiveURL.path)")
         }
 
         let dylibURL = archiveURL.deletingPathExtension().appendingPathExtension("dylib")

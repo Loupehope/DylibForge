@@ -3,7 +3,6 @@ import DylibForgeArchive
 import DylibForgeCore
 import DylibForgeXCFramework
 import Foundation
-import Logging
 
 struct DylibForgeXCFrameworkCLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
@@ -33,22 +32,30 @@ struct DylibForgeXCFrameworkCLI: AsyncParsableCommand {
     @Option(help: "XCFramework dependency. Its matching platform and architecture slice is linked automatically.")
     var xcframeworkDependency: [String] = []
 
+    @Flag(help: "Show logs at all levels.")
+    var verbose = false
+
     func run() async throws {
-        LoggingSystem.bootstrap { ColoredLogHandler.standardError(label: $0) }
-        let logger = Logger(label: "dylib-forge.xcframework")
+        DylibForgeLogger.configure(verbose: verbose)
+        let logger = DylibForgeLogger()
 
         do {
-            try await DylibForgeXCFramework.run(
-                inputPath: input,
-                outputPath: output,
-                sdkArguments: XCFrameworkSDKArguments(
-                    linkerArgs: linkerArgSDK,
-                    ignoredAutolinkDependencies: ignoreAutolinkSDK,
-                    excludedObjectNamePatterns: excludeObjectSDK,
-                ),
-                xcframeworkDependencies: xcframeworkDependency,
-                xcodePath: xcodePath,
-            )
+            try await logger.progressStep(
+                message: "Converting \(input)",
+                successMessage: "Converted \(output)",
+            ) {
+                try await DylibForgeXCFramework.run(
+                    inputPath: input,
+                    outputPath: output,
+                    sdkArguments: XCFrameworkSDKArguments(
+                        linkerArgs: linkerArgSDK,
+                        ignoredAutolinkDependencies: ignoreAutolinkSDK,
+                        excludedObjectNamePatterns: excludeObjectSDK,
+                    ),
+                    xcframeworkDependencies: xcframeworkDependency,
+                    xcodePath: xcodePath,
+                )
+            }
         } catch {
             logger.error("\(ErrorPresenter.message(for: error))")
             throw ExitCode.failure

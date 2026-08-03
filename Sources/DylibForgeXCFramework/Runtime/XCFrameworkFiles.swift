@@ -1,3 +1,4 @@
+import DylibForgeCore
 import Foundation
 
 /// File-system and property-list operations used by XCFramework conversion.
@@ -81,7 +82,7 @@ private extension XCFrameworkFiles {
         let data = try Data(contentsOf: url)
         let propertyList = try PropertyListSerialization.propertyList(from: data, format: nil)
         guard let dictionary = propertyList as? [String: Any] else {
-            throw XCFrameworkError.message("Expected a dictionary property list: \(url.path)")
+            throw DylibForgeError.message("Expected a dictionary property list: \(url.path)")
         }
         return dictionary
     }
@@ -99,7 +100,7 @@ private extension XCFrameworkFiles {
             frameworkURL.appendingPathComponent("Resources/Info.plist"),
         ]
         guard let infoURL = candidateURLs.first(where: { files.fileExists(atPath: $0.path) }) else {
-            throw XCFrameworkError.message("Framework Info.plist does not exist: \(frameworkURL.path)")
+            throw DylibForgeError.message("Framework Info.plist does not exist: \(frameworkURL.path)")
         }
         return infoURL
     }

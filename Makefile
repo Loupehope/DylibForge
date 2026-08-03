@@ -8,12 +8,12 @@ NATIVE_SOURCE_FILES := $(shell find Sources AcceptanceTests -type f \( -name '*.
 
 # Formats every Swift, C, C++, and Objective-C source, including acceptance fixtures and the client project.
 format:
-	swift run swiftformat Package.swift Sources AcceptanceTests --swiftversion 6.2
+	mise exec -- swiftformat Package.swift Sources AcceptanceTests --swiftversion 6.2
 	xcrun clang-format -i $(NATIVE_SOURCE_FILES)
 
 # Checks every Swift, C, C++, and Objective-C source without modifying it; suitable for CI.
 format-check:
-	swift run swiftformat Package.swift Sources AcceptanceTests --swiftversion 6.2 --lint
+	mise exec -- swiftformat Package.swift Sources AcceptanceTests --swiftversion 6.2 --lint
 	xcrun clang-format --dry-run --Werror $(NATIVE_SOURCE_FILES)
 
 # Builds a universal macOS `dylib-forge` executable and packages it as `dylib-forge.zip`.

@@ -1,26 +1,10 @@
 import Foundation
-import Logging
 import Subprocess
-
-/// Controls whether an executed command is echoed and its successful stderr is forwarded to the logger.
-public enum CommandLogging: Sendable {
-    /// Logs the command at info level and non-empty successful stderr at warning level.
-    case enabled
-    /// Captures output without forwarding it to the logger.
-    case disabled
-}
 
 /// Runs an external command and returns its standard output.
 public protocol CommandExecutor: AnyObject, Sendable {
     /// Runs a command represented by its executable followed by arguments.
-    func run(_ arguments: [String], logging: CommandLogging) async throws -> CommandResult
-}
-
-public extension CommandExecutor {
-    /// Runs a command without forwarding its invocation or successful stderr to the logger.
-    func run(_ arguments: [String]) async throws -> CommandResult {
-        try await run(arguments, logging: .disabled)
-    }
+    func run(_ arguments: [String]) async throws -> CommandResult
 }
 
 public extension [String] {
@@ -41,7 +25,7 @@ public final class DefaultCommandExecutor: CommandExecutor {
     private let executor: CommandExecutorImpl
 
     /// Creates an executor that inherits the current process environment.
-    public init(logger: Logger = Logger(label: "dylib-forge.command")) {
+    public init(logger: DylibForgeLogger = DylibForgeLogger()) {
         executor = CommandExecutorImpl(
             developerDirectory: nil,
             logger: logger,
@@ -49,8 +33,8 @@ public final class DefaultCommandExecutor: CommandExecutor {
     }
 
     /// Runs a command represented by its executable followed by arguments.
-    public func run(_ arguments: [String], logging: CommandLogging) async throws -> CommandResult {
-        try await executor.run(arguments, logging: logging)
+    public func run(_ arguments: [String]) async throws -> CommandResult {
+        try await executor.run(arguments)
     }
 }
 
@@ -61,7 +45,7 @@ public final class DeveloperCommandExecutor: CommandExecutor {
     /// Creates an executor that sets `DEVELOPER_DIR` for every command it runs.
     public init(
         developerDirectory: String,
-        logger: Logger = Logger(label: "dylib-forge.command"),
+        logger: DylibForgeLogger = DylibForgeLogger(),
     ) {
         executor = CommandExecutorImpl(
             developerDirectory: developerDirectory,
@@ -70,28 +54,26 @@ public final class DeveloperCommandExecutor: CommandExecutor {
     }
 
     /// Runs a command represented by its executable followed by arguments.
-    public func run(_ arguments: [String], logging: CommandLogging) async throws -> CommandResult {
-        try await executor.run(arguments, logging: logging)
+    public func run(_ arguments: [String]) async throws -> CommandResult {
+        try await executor.run(arguments)
     }
 }
 
 private final class CommandExecutorImpl: Sendable {
     private let developerDirectory: String?
-    private let logger: Logger
+    private let logger: DylibForgeLogger
 
-    init(developerDirectory: String?, logger: Logger) {
+    init(developerDirectory: String?, logger: DylibForgeLogger) {
         self.developerDirectory = developerDirectory
         self.logger = logger
     }
 
-    func run(_ arguments: [String], logging: CommandLogging) async throws -> CommandResult {
+    func run(_ arguments: [String]) async throws -> CommandResult {
         guard let executable = arguments.first else {
             throw DylibForgeError.message("Shell command is empty")
         }
 
-        if logging == .enabled {
-            logger.info("Running command: \(arguments.joined(separator: " "))")
-        }
+        logger.info("Running command: \(arguments.joined(separator: " "))")
 
         let result = try await Subprocess.run(
             .name(executable),
@@ -119,7 +101,7 @@ private final class CommandExecutorImpl: Sendable {
             )
         }
 
-        if logging == .enabled, !trimmedStderr.isEmpty {
+        if !trimmedStderr.isEmpty {
             logger.warning("\(trimmedStderr)")
         }
 

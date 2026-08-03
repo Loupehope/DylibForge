@@ -115,20 +115,3 @@ enum Platform: String, CaseIterable, Sendable {
         }
     }
 }
-
-extension Platform {
-    var relinkingArguments: [String] {
-        switch self {
-        case .macOS:
-            ["--linker-arg-sdk", "macosx", "--linker-arg-sdk", "-mmacosx-version-min=15.0"]
-        case .iOS:
-            ["--linker-arg-sdk", "iphoneos", "--linker-arg-sdk", "-miphoneos-version-min=16.0"]
-        case .iOSSimulator:
-            ["--linker-arg-sdk", "iphonesimulator", "--linker-arg-sdk", "-mios-simulator-version-min=16.0"]
-        case .watchOS:
-            ["--linker-arg-sdk", "watchos", "--linker-arg-sdk", "-mwatchos-version-min=9.0"]
-        case .watchOSSimulator:
-            ["--linker-arg-sdk", "watchsimulator", "--linker-arg-sdk", "-mwatchos-simulator-version-min=9.0"]
-        }
-    }
-}
