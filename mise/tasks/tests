@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE description="Test the dylib-forge ar and xc"
+
+set -euo pipefail
+
+swift run dylib-forge-tests acceptance "$@"

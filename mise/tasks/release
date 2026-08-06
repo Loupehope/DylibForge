@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+#MISE description="Build and package a universal macOS dylib-forge executable"
+
+set -euo pipefail
+
+swift build -c release --arch x86_64 --product dylib-forge
+swift build -c release --arch arm64 --product dylib-forge
+lipo -create .build/x86_64-apple-macosx/release/dylib-forge .build/arm64-apple-macosx/release/dylib-forge -output ./dylib-forge
+strip -rSTx ./dylib-forge
+lipo -info ./dylib-forge
+
+# Rebuild the archive from the current binary; `-m` removes that temporary binary afterward.
+rm -f ./dylib-forge.zip
+zip -j -m ./dylib-forge.zip ./dylib-forge

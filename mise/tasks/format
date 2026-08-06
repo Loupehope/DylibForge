@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+#MISE description="Format source files or check their formatting"
+#USAGE flag "--lint" help="Check formatting without modifying files"
+
+set -euo pipefail
+
+native_source_files=()
+while IFS= read -r -d '' source_file; do
+  native_source_files+=("$source_file")
+done < <(
+  find Sources AcceptanceTests -type f \
+    \( -name '*.c' -o -name '*.cc' -o -name '*.cpp' -o -name '*.cxx' -o -name '*.h' -o -name '*.hpp' -o -name '*.m' -o -name '*.mm' \) \
+    -not -path '*/.build/*' \
+    -not -path '*/.xcodeproj/*' \
+    -print0
+)
+
+if [ "${usage_lint:-false}" = "true" ]; then
+  swiftformat Package.swift Sources AcceptanceTests --swiftversion 6.2 --lint
+  xcrun clang-format --dry-run --Werror "${native_source_files[@]}"
+else
+  swiftformat Package.swift Sources AcceptanceTests --swiftversion 6.2
+  xcrun clang-format -i "${native_source_files[@]}"
+fi
