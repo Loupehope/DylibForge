@@ -40,9 +40,8 @@ struct DylibForgeXCFrameworkCLI: AsyncParsableCommand {
         let logger = DylibForgeLogger()
 
         do {
-            let name = URL(fileURLWithPath: input).standardizedFileURL.resolvingSymlinksInPath().lastPathComponent
             try await logger.progressStep(
-                message: "Converting \(name)",
+                message: "Converting \(input)",
                 successMessage: "Converted to \(output)",
             ) {
                 try await DylibForgeXCFramework.run(

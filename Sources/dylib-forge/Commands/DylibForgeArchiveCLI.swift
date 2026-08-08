@@ -42,9 +42,8 @@ struct DylibForgeArchiveCLI: AsyncParsableCommand {
         let logger = DylibForgeLogger()
 
         do {
-            let name = URL(fileURLWithPath: input).standardizedFileURL.resolvingSymlinksInPath().lastPathComponent
             try await logger.progressStep(
-                message: "Relinking \(name)",
+                message: "Relinking \(input)",
                 successMessage: "Relinked to \(output)",
             ) {
                 try await DylibForge.run(

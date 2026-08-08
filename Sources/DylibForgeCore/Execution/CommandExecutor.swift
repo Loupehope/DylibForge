@@ -1,5 +1,6 @@
 import Foundation
 import Subprocess
+import System
 
 /// Runs an external command and returns its standard output.
 public protocol CommandExecutor: AnyObject, Sendable {
@@ -75,15 +76,18 @@ private final class CommandExecutorImpl: Sendable {
 
         logger.info("Running command: \(arguments.joined(separator: " "))")
 
+        let executableConfiguration: Executable = executable.contains("/")
+            ? .path(FilePath(executable))
+            : .name(executable)
         let result = try await Subprocess.run(
-            .name(executable),
+            executableConfiguration,
             arguments: Arguments(Array(arguments.dropFirst())),
             environment: subprocessEnvironment,
             output: .string(limit: .max),
             error: .string(limit: .max),
         )
-        let stdout = result.standardOutput ?? ""
-        let stderr = result.standardError ?? ""
+        let stdout = result.standardOutput
+        let stderr = result.standardError
         let trimmedStderr = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard result.terminationStatus.isSuccess else {
